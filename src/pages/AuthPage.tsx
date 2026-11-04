@@ -1,6 +1,7 @@
 import { useState } from "react"
 import type { FirebaseError } from "firebase/app"
 import type { AuthResult } from "../types"
+import { DEMO_EMAIL, DEMO_PASSWORD } from "../constants/demo"
 
 const FIREBASE_ERRORS: Record<string, string> = {
   "auth/email-already-in-use":  "Este email ya está registrado.",
@@ -42,6 +43,13 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
     setLoading(false)
   }
 
+  const handleTester = async () => {
+    setLoading(true); setErr(""); setMsg("")
+    const { error } = await onSignIn(DEMO_EMAIL, DEMO_PASSWORD)
+    if (error) setErr(FIREBASE_ERRORS[(error as FirebaseError).code] ?? error.message)
+    setLoading(false)
+  }
+
   const toggleMode = () => {
     setMode(mode === "login" ? "signup" : "login")
     setErr("")
@@ -77,6 +85,12 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
             className={`w-full py-2.5 rounded-lg bg-accent text-black text-sm font-bold transition-opacity mb-4 ${loading ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
             {loading ? "Cargando..." : mode === "login" ? "Entrar" : "Registrarse"}
           </button>
+          {mode === "login" && (
+            <button onClick={handleTester} disabled={loading}
+              className="w-full py-2.5 rounded-lg border border-border text-sm font-medium text-text hover:border-accent transition-colors mb-4 disabled:opacity-50">
+              Entrar como Tester
+            </button>
+          )}
           <p className="text-center text-xs text-muted">
             {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
             <button onClick={toggleMode} className="text-accent hover:underline">
