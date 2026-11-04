@@ -7,6 +7,8 @@ import Overview from "./pages/Overview"
 import Transactions from "./pages/Transactions"
 import Analytics from "./pages/Analytics"
 import AuthPage from "./pages/AuthPage"
+import { ADMIN_EMAIL } from "./constants/demo"
+import { resetDemoData } from "./lib/demoData"
 
 const App = () => {
   const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
@@ -24,6 +26,16 @@ const App = () => {
 
   if (!user) return <AuthPage onSignIn={signIn} onSignUp={signUp} />
 
+  const isAdmin = user.email === ADMIN_EMAIL
+  const handleReset = async () => {
+    if (!window.confirm("¿Reiniciar los datos de la cuenta de demostración?")) return
+    try {
+      await resetDemoData()
+    } catch (e) {
+      window.alert("No se pudo reiniciar: " + (e as Error).message)
+    }
+  }
+
   const pages: Record<string, JSX.Element> = {
     overview:     <Overview     transactions={transactions} totals={totals} />,
     transactions: <Transactions transactions={transactions} onDelete={deleteTransaction} />,
@@ -38,6 +50,7 @@ const App = () => {
         onAdd={() => setShowModal(true)}
         onSignOut={signOut}
         userEmail={user.email}
+        onReset={isAdmin ? handleReset : undefined}
       />
       <main className="max-w-5xl mx-auto px-4 py-6 sm:px-8 sm:py-8">
         {txLoading
