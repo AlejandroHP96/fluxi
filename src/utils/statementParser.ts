@@ -103,11 +103,13 @@ export function parseRevolutCsv(csvText: string, ignoreSavingsTransfers = true):
     const rawAmount = row["Amount"] || row["Importe"] || "0"
     const rawDate = row["Completed Date"] || row["Started Date"] || row["Fecha de finalización"] || row["Fecha de inicio"] || row["Date"] || row["Fecha"] || ""
 
-    // Filtrar traspasos internos a/desde la cuenta de ahorro de Revolut
-    // Ejemplos: "A EUR Ahorros", "Desde EUR Ahorros", "To EUR Savings", "From EUR Savings", "Vault", etc.
+    // Filtrar traspasos internos a/desde la cuenta de ahorro de Revolut e intereses diarios
+    // Ejemplos: "A EUR Ahorros", "Desde EUR Ahorros", "To EUR Savings", "Interés neto pagado a Ahorros", "Vault", etc.
     if (ignoreSavingsTransfers) {
-      const isSavingTransfer = /^(A|Desde|To|From)\s+.*(Ahorros|Savings|Vault|Pocket|Bolsillo)/i.test(rawDesc) ||
-        /\b(Ahorros|Vault|Pocket)\b/i.test(rawDesc) && /^(A|Desde|To|From)\s+/i.test(rawDesc)
+      const isSavingTransfer =
+        /^(A|Desde|To|From)\s+.*(Ahorros|Savings|Vault|Pocket|Bolsillo)/i.test(rawDesc) ||
+        /\b(Ahorros|Vault|Pocket)\b/i.test(rawDesc) && /^(A|Desde|To|From)\s+/i.test(rawDesc) ||
+        /inter[eé]s.*(ahorros|savings|vault)/i.test(rawDesc)
       if (isSavingTransfer) {
         continue
       }
