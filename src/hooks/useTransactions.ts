@@ -47,6 +47,37 @@ export const useTransactions = (userId: string | undefined) => {
     }
   }
 
+  const addBatchTransactions = async (txs: NewTransaction[]): Promise<number> => {
+    if (!userId || txs.length === 0) return 0
+    try {
+      const { writeBatch } = await import("firebase/firestore")
+      // Firebase limita los batches a 500 operaciones
+      const chunkSize = 400
+      let totalAdded = 0
+
+      for (let i = 0; i < txs.length; i += chunkSize) {
+        const chunk = txs.slice(i, i + chunkSize)
+        const batch = writeBatch(db)
+
+        for (const tx of chunk) {
+          const docRef = doc(collection(db, "transactions"))
+          batch.set(docRef, {
+            ...tx,
+            userId,
+            createdAt: serverTimestamp(),
+          })
+        }
+        await batch.commit()
+        totalAdded += chunk.length
+      }
+
+      return totalAdded
+    } catch (e) {
+      setError((e as Error).message)
+      return 0
+    }
+  }
+
   const deleteTransaction = async (id: string): Promise<boolean> => {
     try {
       await deleteDoc(doc(db, "transactions", id))
@@ -75,5 +106,5 @@ export const useTransactions = (userId: string | undefined) => {
       : "0.0",
   }
 
-  return { transactions, loading, error, addTransaction, deleteTransaction, totals }
+  return { transactions, loading, error, addTransaction, addBatchTransactions, deleteTransaction, totals }
 }

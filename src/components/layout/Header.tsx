@@ -2,6 +2,7 @@ interface HeaderProps {
   activeTab: string
   setActiveTab: (tab: string) => void
   onAdd: () => void
+  onImport: () => void
   onSignOut: () => void
   userEmail: string | null
   /** Solo se pasa a la cuenta admin: reinicia los datos de la demo */
@@ -10,7 +11,7 @@ interface HeaderProps {
 
 const tabs = ["overview", "transactions", "analytics"]
 
-const Header = ({ activeTab, setActiveTab, onAdd, onSignOut, userEmail, onReset }: HeaderProps) => (
+const Header = ({ activeTab, setActiveTab, onAdd, onImport, onSignOut, userEmail, onReset }: HeaderProps) => (
   <div className="border-b border-border px-4 sm:px-8">
     <div className="max-w-5xl mx-auto">
       <div className="flex items-center justify-between h-14">
@@ -34,6 +35,10 @@ const Header = ({ activeTab, setActiveTab, onAdd, onSignOut, userEmail, onReset 
               Reiniciar demo
             </button>
           )}
+          <button onClick={onImport} className="px-3 sm:px-4 py-1.5 rounded-lg border border-border text-xs sm:text-sm font-semibold text-text hover:border-accent transition-colors flex items-center gap-1.5">
+            <span>📄</span>
+            <span className="hidden sm:inline">Importar</span>
+          </button>
           <button onClick={onAdd} className="px-3 sm:px-4 py-1.5 rounded-lg bg-accent text-black text-sm font-semibold hover:opacity-90 transition-opacity">+ Añadir</button>
           <button onClick={onSignOut} className="text-muted text-xs hover:text-text transition-colors">Salir</button>
         </div>

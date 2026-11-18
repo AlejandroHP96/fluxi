@@ -3,6 +3,7 @@ import { useAuth } from "./hooks/useAuth"
 import { useTransactions } from "./hooks/useTransactions"
 import Header from "./components/layout/Header"
 import AddTransactionModal from "./components/transactions/AddTransactionModal"
+import { ImportStatementModal } from "./components/transactions/ImportStatementModal"
 import Overview from "./pages/Overview"
 import Transactions from "./pages/Transactions"
 import Analytics from "./pages/Analytics"
@@ -12,9 +13,10 @@ import { resetDemoData } from "./lib/demoData"
 
 const App = () => {
   const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
-  const { transactions, loading: txLoading, addTransaction, deleteTransaction, totals } = useTransactions(user?.uid)
+  const { transactions, loading: txLoading, addTransaction, addBatchTransactions, deleteTransaction, totals } = useTransactions(user?.uid)
   const [activeTab, setActiveTab] = useState("overview")
   const [showModal, setShowModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
 
   if (authLoading) {
     return (
@@ -48,6 +50,7 @@ const App = () => {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         onAdd={() => setShowModal(true)}
+        onImport={() => setShowImportModal(true)}
         onSignOut={signOut}
         userEmail={user.email}
         onReset={isAdmin ? handleReset : undefined}
@@ -59,6 +62,12 @@ const App = () => {
         }
       </main>
       {showModal && <AddTransactionModal onClose={() => setShowModal(false)} onAdd={addTransaction} />}
+      {showImportModal && (
+        <ImportStatementModal
+          onClose={() => setShowImportModal(false)}
+          onImport={addBatchTransactions}
+        />
+      )}
     </div>
   )
 }
