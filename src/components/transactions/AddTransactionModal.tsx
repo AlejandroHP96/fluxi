@@ -1,5 +1,5 @@
 import { useState, useRef, ChangeEvent } from "react"
-import { Camera, Loader2 } from "lucide-react"
+import { Camera, Image as ImageIcon, Loader2 } from "lucide-react"
 import { CATEGORIES } from "../../constants/categories"
 import { compressImage } from "../../utils/imageUtils"
 import type { NewTransaction, TransactionType } from "../../types"
@@ -31,7 +31,8 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
   const [scanning, setScanning] = useState(false)
   const [err, setErr]           = useState("")
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }))
@@ -74,7 +75,8 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
       setErr(error.message || "No se pudo leer el ticket")
     } finally {
       setScanning(false)
-      if (fileInputRef.current) fileInputRef.current.value = ""
+      if (cameraInputRef.current) cameraInputRef.current.value = ""
+      if (galleryInputRef.current) galleryInputRef.current.value = ""
     }
   }
 
@@ -111,35 +113,52 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
           <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
         </div>
 
-        {/* Botón de cámara (abre la cámara trasera en móvil) */}
+        {/* Botones de escanear (Cámara y Galería) */}
         {form.type === "expense" && (
-          <div className="mb-4">
+          <div className="mb-4 space-y-2">
+            {/* Input para cámara nativa */}
             <input
-              ref={fileInputRef}
+              ref={cameraInputRef}
               type="file"
               accept="image/*"
               capture="environment"
               onChange={handleCapture}
               className="hidden"
             />
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={scanning}
-              className="w-full py-2.5 px-3 rounded-lg border border-dashed border-border hover:border-accent text-xs font-medium text-text flex items-center justify-center gap-2 transition-colors bg-surface/50"
-            >
-              {scanning ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                  <span>Leyendo ticket con Gemini...</span>
-                </>
-              ) : (
-                <>
-                  <Camera className="w-4 h-4 text-accent" />
-                  <span>Escanear ticket con cámara</span>
-                </>
-              )}
-            </button>
+            {/* Input para galería / archivo */}
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCapture}
+              className="hidden"
+            />
+
+            {scanning ? (
+              <div className="w-full py-2.5 px-3 rounded-lg border border-border bg-surface/50 text-xs font-medium text-text flex items-center justify-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                <span>Leyendo ticket con Gemini...</span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="py-2 px-2 rounded-lg border border-dashed border-border hover:border-accent text-xs font-medium text-text flex items-center justify-center gap-1.5 transition-colors bg-surface/50"
+                >
+                  <Camera className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="truncate">Hacer foto</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="py-2 px-2 rounded-lg border border-dashed border-border hover:border-accent text-xs font-medium text-text flex items-center justify-center gap-1.5 transition-colors bg-surface/50"
+                >
+                  <ImageIcon className="w-3.5 h-3.5 text-accent shrink-0" />
+                  <span className="truncate">Subir de galería</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
