@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react"
-import { Trash2 } from "lucide-react"
+import { useState, useMemo, useEffect, useRef } from "react"
+import { Trash2, Loader2 } from "lucide-react"
 import TransactionRow from "../components/transactions/TransactionRow"
 import { MonthSelector } from "../components/ui/MonthSelector"
 import { fmtDec } from "../utils/formatters"
@@ -26,6 +26,16 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
   })
   const [typeFilter, setTypeFilter] = useState("all")
 
+  // Estado para scroll infinito (50 elementos iniciales, +50 al llegar abajo)
+  const PAGE_SIZE = 50
+  const [visibleCount, setVisibleCount] = useState<number>(PAGE_SIZE)
+  const observerTarget = useRef<HTMLDivElement>(null)
+
+  // Reiniciar el contador visible al cambiar de mes o filtro
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [selectedMonth, typeFilter])
+
   const filtered = useMemo(() => {
     let result = filterTransactionsByMonth(transactions, selectedMonth)
     if (typeFilter !== "all") {
@@ -33,6 +43,31 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
     }
     return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [transactions, selectedMonth, typeFilter])
+
+  // Transacciones efectivamente renderizadas en pantalla
+  const visibleTransactions = useMemo(() => {
+    return filtered.slice(0, visibleCount)
+  }, [filtered, visibleCount])
+
+  const hasMore = visibleCount < filtered.length
+
+  // IntersectionObserver para detectar cuándo el usuario está llegando al final
+  useEffect(() => {
+    const el = observerTarget.current
+    if (!el || !hasMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, filtered.length))
+        }
+      },
+      { rootMargin: "250px" } // Comienza a cargar 250px antes de llegar al fondo
+    )
+
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, filtered.length])
 
   return (
     <div className="fade-up space-y-5">
@@ -95,7 +130,7 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
             No hay transacciones registradas en este periodo.
           </p>
         ) : (
-          filtered.map((t) => (
+          visibleTransactions.map((t) => (
             <div key={t.id} className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.02]">
               <div className="flex-1 min-w-0 pr-3">
                 <p className="text-xs font-semibold text-white truncate">{t.description}</p>
@@ -149,7 +184,7 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
                 </td>
               </tr>
             ) : (
-              filtered.map((t, i) => (
+              visibleTransactions.map((t, i) => (
                 <TransactionRow
                   key={t.id}
                   tx={t}
@@ -161,6 +196,14 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
           </tbody>
         </table>
       </div>
+
+      {/* Elemento disparador de scroll infinito */}
+      {hasMore && (
+        <div ref={observerTarget} className="py-4 flex items-center justify-center gap-2 text-xs text-white/40">
+          <Loader2 className="w-3.5 h-3.5 animate-spin text-cyan-400" />
+          <span>Cargando más movimientos... ({visibleTransactions.length} de {filtered.length})</span>
+        </div>
+      )}
     </div>
   )
 }
