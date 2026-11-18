@@ -7,6 +7,7 @@ import {
   LogOut,
   Sparkles,
 } from "lucide-react"
+import { UserAvatar } from "../ui/UserAvatar"
 
 interface SidebarProps {
   activeTab: string
@@ -15,6 +16,8 @@ interface SidebarProps {
   onImport: () => void
   onSignOut: () => void
   userEmail: string | null
+  photoUrl: string | null
+  onUpdateAvatar?: (base64: string) => Promise<boolean>
   txCount: number
 }
 
@@ -25,9 +28,10 @@ export const Sidebar = ({
   onImport,
   onSignOut,
   userEmail,
+  photoUrl,
+  onUpdateAvatar,
   txCount,
 }: SidebarProps) => {
-  const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "A"
   const userName = userEmail ? userEmail.split("@")[0] : "Usuario"
 
   return (
@@ -123,12 +127,16 @@ export const Sidebar = ({
       {/* 3. Footer de Usuario / Perfil en la Sidebar */}
       <div className="pt-4 border-t border-white/[0.08] flex items-center justify-between px-1">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center text-slate-950 font-bold text-xs shrink-0 shadow-md">
-            {userInitial}
-          </div>
+          <UserAvatar
+            photoUrl={photoUrl}
+            email={userEmail}
+            size="md"
+            editable={true}
+            onPhotoUploaded={onUpdateAvatar}
+          />
           <div className="min-w-0 pr-1">
             <p className="text-xs font-medium text-white truncate capitalize">{userName}</p>
-            <p className="text-[10px] text-white/40 truncate">Pro Plan</p>
+            <p className="text-[10px] text-white/40 truncate">Cambiar foto</p>
           </div>
         </div>
         <button

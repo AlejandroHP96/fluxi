@@ -13,7 +13,7 @@ import { getAvailableMonths } from "./utils/dateFilters"
 import { LayoutDashboard, ReceiptText, BarChart3 } from "lucide-react"
 
 const App = () => {
-  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
+  const { user, photoUrl, updateAvatar, loading: authLoading, signIn, signUp, signOut } = useAuth()
   const {
     transactions,
     addTransaction,
@@ -58,6 +58,8 @@ const App = () => {
         onImport={() => setShowImportModal(true)}
         onSignOut={signOut}
         userEmail={user.email}
+        photoUrl={photoUrl}
+        onUpdateAvatar={updateAvatar}
         txCount={transactions.length}
       />
 
@@ -73,6 +75,8 @@ const App = () => {
           onAdd={() => setShowModal(true)}
           onImport={() => setShowImportModal(true)}
           userEmail={user.email}
+          photoUrl={photoUrl}
+          onUpdateAvatar={updateAvatar}
         />
 
         {/* Barra de pestañas móvil en parte superior */}

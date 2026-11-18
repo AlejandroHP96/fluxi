@@ -1,5 +1,6 @@
 import { Search, Plus, Upload } from "lucide-react"
 import { MonthSelector } from "../ui/MonthSelector"
+import { UserAvatar } from "../ui/UserAvatar"
 import type { MonthOption } from "../../utils/dateFilters"
 
 interface TopbarProps {
@@ -11,6 +12,8 @@ interface TopbarProps {
   onAdd: () => void
   onImport: () => void
   userEmail: string | null
+  photoUrl: string | null
+  onUpdateAvatar?: (base64: string) => Promise<boolean>
 }
 
 export const Topbar = ({
@@ -22,8 +25,9 @@ export const Topbar = ({
   onAdd,
   onImport,
   userEmail,
+  photoUrl,
+  onUpdateAvatar,
 }: TopbarProps) => {
-  const userInitial = userEmail ? userEmail.charAt(0).toUpperCase() : "A"
   const userName = userEmail ? userEmail.split("@")[0] : "Admin"
 
   return (
@@ -75,10 +79,14 @@ export const Topbar = ({
         <div className="h-5 w-px bg-white/10 mx-1 hidden sm:block" />
 
         {/* Notificaciones y Perfil */}
-        <div className="hidden sm:flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center text-slate-950 font-bold text-xs shadow-md">
-            {userInitial}
-          </div>
+        <div className="flex items-center gap-2">
+          <UserAvatar
+            photoUrl={photoUrl}
+            email={userEmail}
+            size="md"
+            editable={true}
+            onPhotoUploaded={onUpdateAvatar}
+          />
           <div className="text-left hidden md:block">
             <p className="text-xs font-medium text-white capitalize leading-none">{userName}</p>
             <p className="text-[10px] text-white/40 leading-none mt-1">Owner</p>
