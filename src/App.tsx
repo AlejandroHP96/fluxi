@@ -18,6 +18,7 @@ const App = () => {
     transactions,
     addTransaction,
     addBatchTransactions,
+    updateBatchTransactions,
     deleteTransaction,
     deleteAllTransactions,
     totals,
@@ -146,6 +147,8 @@ const App = () => {
         <ImportStatementModal
           onClose={() => setShowImportModal(false)}
           onImport={addBatchTransactions}
+          onUpdateBatch={updateBatchTransactions}
+          existingTransactions={transactions}
         />
       )}
     </div>

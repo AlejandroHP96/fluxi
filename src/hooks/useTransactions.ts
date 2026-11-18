@@ -111,6 +111,37 @@ export const useTransactions = (userId: string | undefined) => {
     }
   }
 
+  const updateBatchTransactions = async (
+    updates: Array<{ id: string; description: string; category: string }>
+  ): Promise<number> => {
+    if (!userId || updates.length === 0) return 0
+    try {
+      const { writeBatch } = await import("firebase/firestore")
+      const chunkSize = 400
+      let totalUpdated = 0
+
+      for (let i = 0; i < updates.length; i += chunkSize) {
+        const chunk = updates.slice(i, i + chunkSize)
+        const batch = writeBatch(db)
+
+        for (const item of chunk) {
+          const docRef = doc(db, "transactions", item.id)
+          batch.update(docRef, {
+            description: item.description,
+            category: item.category,
+          })
+        }
+        await batch.commit()
+        totalUpdated += chunk.length
+      }
+
+      return totalUpdated
+    } catch (e) {
+      setError((e as Error).message)
+      return 0
+    }
+  }
+
   const acc = transactions.reduce(
     (a, t) => {
       if (t.type === "income")  a.income  += Number(t.amount)
@@ -129,5 +160,5 @@ export const useTransactions = (userId: string | undefined) => {
       : "0.0",
   }
 
-  return { transactions, loading, error, addTransaction, addBatchTransactions, deleteTransaction, deleteAllTransactions, totals }
+  return { transactions, loading, error, addTransaction, addBatchTransactions, updateBatchTransactions, deleteTransaction, deleteAllTransactions, totals }
 }
