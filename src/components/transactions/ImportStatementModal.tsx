@@ -162,8 +162,11 @@ export const ImportStatementModal = ({
         throw new Error("No se encontraron compras en el extracto de Ventajón")
       }
 
-      // Enlazar items de Ventajón con transacciones de Ventajon
-      const ventajonTxs = existingTransactions.filter((t) =>
+      // Combinar transacciones existentes con las recién importadas en esta sesión
+      const allTransactions = [...existingTransactions]
+      // Si se acaban de importar en previewTxs pero Firestore aún no ha emitido el snapshot,
+      // buscamos en existingTransactions que contengan "ventajon"
+      const ventajonTxs = allTransactions.filter((t) =>
         t.description.toLowerCase().includes("ventajon")
       )
 
