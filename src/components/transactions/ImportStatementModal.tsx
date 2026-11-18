@@ -55,6 +55,7 @@ export const ImportStatementModal = ({
   const [successCount, setSuccessCount] = useState<number | null>(null)
   const [ventajonCount, setVentajonCount] = useState<number>(0)
   const [updatedVentajonCount, setUpdatedVentajonCount] = useState<number | null>(null)
+  const [pendingVentajonCount, setPendingVentajonCount] = useState(0)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const ventajonFileInputRef = useRef<HTMLInputElement>(null)
@@ -244,10 +245,14 @@ export const ImportStatementModal = ({
         setUpdatedVentajonCount(0)
       }
 
+      setPendingVentajonCount(unmatched.length)
       setStep("done")
-      setTimeout(() => {
-        onClose()
-      }, 2500)
+      // Si quedan pendientes no se cierra solo, para que dé tiempo a leer el aviso
+      if (unmatched.length === 0) {
+        setTimeout(() => {
+          onClose()
+        }, 2500)
+      }
     } catch (err: any) {
       setError(err?.message || "Error al leer el extracto de Ventajón")
     } finally {
@@ -411,9 +416,10 @@ export const ImportStatementModal = ({
                 Se han detectado {ventajonCount} pagos de &quot;Ventajon&quot;
               </p>
               <p className="text-white/70 leading-relaxed">
-                ¿Tienes a mano el extracto digital en PDF de Ventajón de este mismo mes? Podemos
-                reemplazar &quot;Ventajon&quot; por el comercio real (Mercadona, McDonald&apos;s,
-                IKEA...) y categorizarlos al instante.
+                ¿Tienes a mano el extracto digital en PDF de Ventajón? Podemos reemplazar
+                &quot;Ventajon&quot; por el comercio real (Mercadona, McDonald&apos;s, IKEA...) y
+                categorizarlos al instante. Ojo: el extracto de cada mes recoge las compras del mes
+                anterior (el de diciembre trae las de noviembre).
               </p>
             </div>
 
@@ -515,6 +521,12 @@ export const ImportStatementModal = ({
               {updatedVentajonCount !== null && (
                 <p className="text-xs text-cyan-300 mt-1">
                   Se desglosaron {updatedVentajonCount} comercios reales de Ventajón.
+                </p>
+              )}
+              {pendingVentajonCount > 0 && (
+                <p className="text-[11px] text-white/50 mt-1 max-w-xs">
+                  {pendingVentajonCount} pagos de Ventajon siguen sin comercio: no aparecen en ese PDF.
+                  Sube el extracto del mes siguiente cuando lo tengas.
                 </p>
               )}
             </div>

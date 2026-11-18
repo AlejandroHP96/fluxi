@@ -12,7 +12,8 @@ function cleanVentajonConcept(raw: string): string {
   let s = raw.trim()
   s = s.replace(/\s+(ES|NL|FR|DE)$/i, "")
   s = s.replace(/\s+PINPAD\b/i, "")
-  s = s.replace(/\b(SANTA CRUZ DE|SAN CRISTOBAL|LA LAGUNA|SAN CRISTOBLA)\b.*/i, "")
+  // Sin \b final: el PDF pega el país a la localidad ("SANTA CRUZ DEES", "SAN CRISTOBALES")
+  s = s.replace(/\b(SANTA CRUZ DE|SANATA CRUZ|SAN CRISTOBAL|LA LAGUNA|SAN CRISTOBLA).*/i, "").trim()
   s = s.replace(/FINCA ESPA#?A/i, "Finca España")
   s = s.replace(/RTE\b/i, "Restaurante")
 
@@ -87,10 +88,17 @@ export default async function handler(req: any, res: any) {
     }> = []
 
     const re = /(\d{2}\.\d{2})\s*(\d{2}:\d{2})\s*(.+?)\s*(\d+,\d{2})/
+    const startRe = /^\d{2}\.\d{2}\s*\d{2}:\d{2}/
 
+    // Algunas compras con concepto largo salen partidas en varias líneas
+    // ("30.1020:01" / "SAVE STORE ..." / "DEES" / "49,99--2+ 1,00"): se van juntando hasta tener importe.
+    let pending = ""
     for (const line of lines) {
       const trimmed = line.trim()
-      const match = trimmed.match(re)
+      if (!trimmed) continue
+      const candidate = pending && !startRe.test(trimmed) ? `${pending} ${trimmed}` : trimmed
+      const match = candidate.match(re)
+      pending = !match && startRe.test(candidate) && candidate.length < 200 ? candidate : ""
       if (match) {
         const [_, dateStr, timeStr, rawConcept, amtStr] = match
         if (
