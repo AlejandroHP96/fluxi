@@ -106,8 +106,8 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
   ]
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center">
-      <div className="bg-card border border-border rounded-2xl p-5 sm:p-7 w-full max-w-sm mx-4">
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-card border border-border rounded-2xl p-5 sm:p-7 w-full max-w-sm my-auto max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-base font-semibold">Nueva transacción</h3>
           <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
@@ -182,7 +182,7 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
               placeholder={f.placeholder}
               value={form[f.key]}
               onChange={(e) => set(f.key, e.target.value as FormState[typeof f.key])}
-              className="w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors"
+              className="w-full min-w-0 max-w-full bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text outline-none focus:border-accent transition-colors appearance-none"
             />
           </div>
         ))}
