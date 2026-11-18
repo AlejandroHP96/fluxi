@@ -12,6 +12,34 @@ interface ImportStatementModalProps {
 
 type Step = "upload_statement" | "ask_ventajon" | "upload_ventajon" | "done"
 
+const MAX_DAY_DIFF = 3
+const DAY_MS = 24 * 60 * 60 * 1000
+
+const isVentajon = (description: string) =>
+  description.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().includes("ventajon")
+
+// Acepta "YYYY-MM-DD[ HH:mm]" y "DD/MM/YYYY[ HH:mm]"; devuelve medianoche UTC del día
+const parseTxDay = (date: string): Date | null => {
+  const iso = date.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (iso) return new Date(Date.UTC(+iso[1], +iso[2] - 1, +iso[3]))
+  const eu = date.match(/(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/)
+  if (eu) return new Date(Date.UTC(+eu[3], +eu[2] - 1, +eu[1]))
+  return null
+}
+
+// Distancia en días entre la fecha del movimiento y un "DD.MM" de Ventajón (sin año;
+// se prueba el año del movimiento y los adyacentes por el cambio de año)
+const dayDiffToShortDate = (txDay: Date, dateShort: string): number => {
+  const m = String(dateShort).match(/^(\d{1,2})\.(\d{1,2})$/)
+  if (!m) return Infinity
+  const year = txDay.getUTCFullYear()
+  return Math.min(
+    ...[year - 1, year, year + 1].map((y) =>
+      Math.abs(txDay.getTime() - Date.UTC(y, +m[2] - 1, +m[1])) / DAY_MS
+    )
+  )
+}
+
 export const ImportStatementModal = ({
   onClose,
   onImport,
@@ -101,9 +129,7 @@ export const ImportStatementModal = ({
         setSuccessCount(count)
 
         // Contar cuántos cargos son de "Ventajon" en este lote
-        const vCount = previewTxs.filter((t) =>
-          t.description.toLowerCase().includes("ventajon")
-        ).length
+        const vCount = previewTxs.filter((t) => isVentajon(t.description)).length
 
         // Comprobar si el usuario tiene desactivada la ayuda de Ventajón
         const ventajonDisabled = localStorage.getItem("fluxi_disable_ventajon") === "true"
@@ -162,40 +188,53 @@ export const ImportStatementModal = ({
         throw new Error("No se encontraron compras en el extracto de Ventajón")
       }
 
-      // Combinar transacciones existentes con las recién importadas en esta sesión
-      const allTransactions = [...existingTransactions]
-      // Si se acaban de importar en previewTxs pero Firestore aún no ha emitido el snapshot,
-      // buscamos en existingTransactions que contengan "ventajon"
-      const ventajonTxs = allTransactions.filter((t) =>
-        t.description.toLowerCase().includes("ventajon")
-      )
+      // existingTransactions llega por props desde el onSnapshot de App.tsx, que ya incluye
+      // los movimientos recién importados (Firestore emite primero las escrituras locales).
+      const ventajonTxs = existingTransactions.filter((t) => isVentajon(t.description))
 
       const usedItems = new Set<number>()
       const updates: Array<{ id: string; description: string; category: string }> = []
+      const unmatched: Array<{ date: string; amount: number }> = []
 
       for (const tx of ventajonTxs) {
         const txAmt = Math.abs(Number(tx.amount))
-        // Fecha ej: "2026-10-31" o "2026-10-31 13:30:00" -> "31.10"
-        const dateMatch = tx.date.match(/\d{4}-(\d{2})-(\d{2})/)
-        if (!dateMatch) continue
-        const shortDate = `${dateMatch[2]}.${dateMatch[1]}`
+        const txDay = parseTxDay(tx.date)
+        if (!txDay) {
+          unmatched.push({ date: tx.date, amount: tx.amount })
+          continue
+        }
 
-        const foundIndex = items.findIndex(
-          (it: any, idx: number) =>
-            !usedItems.has(idx) &&
-            it.dateShort === shortDate &&
-            Math.abs(it.amount - txAmt) < 0.01
-        )
+        // Mismo importe y fecha más cercana (Revolut puede usar la fecha de liquidación,
+        // uno o varios días después de la compra en Ventajón).
+        let bestIdx = -1
+        let bestDiff = Infinity
+        items.forEach((it: any, idx: number) => {
+          if (usedItems.has(idx) || Math.abs(Number(it.amount) - txAmt) >= 0.01) return
+          const diff = dayDiffToShortDate(txDay, it.dateShort)
+          if (diff <= MAX_DAY_DIFF && diff < bestDiff) {
+            bestDiff = diff
+            bestIdx = idx
+          }
+        })
 
-        if (foundIndex !== -1) {
-          usedItems.add(foundIndex)
-          const matchedItem = items[foundIndex]
+        if (bestIdx !== -1) {
+          usedItems.add(bestIdx)
+          const matchedItem = items[bestIdx]
           updates.push({
             id: tx.id,
             description: matchedItem.concept,
             category: matchedItem.category,
           })
+        } else {
+          unmatched.push({ date: tx.date, amount: tx.amount })
         }
+      }
+
+      if (unmatched.length > 0) {
+        console.warn(
+          `[Ventajón] ${ventajonTxs.length} movimientos, ${updates.length} emparejados, ${unmatched.length} sin pareja`,
+          { unmatched: unmatched.slice(0, 10), items: items.slice(0, 10) }
+        )
       }
 
       if (updates.length > 0 && onUpdateBatch) {
