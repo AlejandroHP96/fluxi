@@ -1,5 +1,4 @@
 import Papa from "papaparse"
-import { CATEGORIES } from "../constants/categories"
 import type { NewTransaction } from "../types"
 
 /**

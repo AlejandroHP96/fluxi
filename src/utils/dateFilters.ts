@@ -1,4 +1,3 @@
-import { MONTHS } from "../constants/categories"
 import type { Transaction } from "../types"
 
 export interface MonthOption {

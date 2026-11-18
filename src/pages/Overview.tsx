@@ -3,7 +3,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
 } from "recharts"
-import { Wallet, TrendingUp, TrendingDown, PiggyBank, ArrowUpRight } from "lucide-react"
+import { Wallet, TrendingUp, TrendingDown, PiggyBank } from "lucide-react"
 import KpiCard from "../components/ui/KpiCard"
 import CustomTooltip from "../components/ui/CustomTooltip"
 import { MonthSelector } from "../components/ui/MonthSelector"

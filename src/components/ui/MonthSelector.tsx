@@ -1,5 +1,5 @@
 import { Calendar } from "lucide-react"
-import type { MonthOption } from "../utils/dateFilters"
+import type { MonthOption } from "../../utils/dateFilters"
 
 interface MonthSelectorProps {
   value: string

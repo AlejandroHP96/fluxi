@@ -2,11 +2,9 @@ import {
   LayoutDashboard,
   ReceiptText,
   BarChart3,
-  Search,
   Plus,
   Upload,
   LogOut,
-  Calendar,
   Sparkles,
 } from "lucide-react"
 

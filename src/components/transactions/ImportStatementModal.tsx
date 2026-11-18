@@ -1,5 +1,5 @@
 import { useState, useRef, ChangeEvent } from "react"
-import { FileSpreadsheet, FileText, Loader2, Upload, Check, AlertCircle, X } from "lucide-react"
+import { FileSpreadsheet, FileText, Loader2, Upload, Check, AlertCircle } from "lucide-react"
 import { parseRevolutCsv } from "../../utils/statementParser"
 import type { NewTransaction } from "../../types"
 

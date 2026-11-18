@@ -1,4 +1,4 @@
-import { Search, Plus, Upload, Bell, Sparkles } from "lucide-react"
+import { Search, Plus, Upload } from "lucide-react"
 import { MonthSelector } from "../ui/MonthSelector"
 import type { MonthOption } from "../../utils/dateFilters"
 

@@ -10,13 +10,12 @@ import AuthPage from "./pages/AuthPage"
 import AddTransactionModal from "./components/transactions/AddTransactionModal"
 import { ImportStatementModal } from "./components/transactions/ImportStatementModal"
 import { getAvailableMonths } from "./utils/dateFilters"
-import { LayoutDashboard, ReceiptText, BarChart3, Plus, Upload } from "lucide-react"
+import { LayoutDashboard, ReceiptText, BarChart3 } from "lucide-react"
 
 const App = () => {
   const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
   const {
     transactions,
-    loading: txLoading,
     addTransaction,
     addBatchTransactions,
     deleteTransaction,
