@@ -4,20 +4,20 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["'DM Sans'", "sans-serif"],
+        sans: ["'DM Sans'", "Inter", "sans-serif"],
         mono: ["'DM Mono'", "monospace"],
       },
       colors: {
-        bg:      "#0f0f13",
-        surface: "#16161d",
-        card:    "#1c1c26",
-        border:  "#2a2a38",
-        muted:   "#6b6b80",
-        text:    "#e8e8f0",
-        income:  "#4ade80",
+        bg:      "#07090e",
+        surface: "rgba(255, 255, 255, 0.03)",
+        card:    "rgba(255, 255, 255, 0.04)",
+        border:  "rgba(255, 255, 255, 0.08)",
+        muted:   "rgba(255, 255, 255, 0.55)",
+        text:    "#ffffff",
+        income:  "#34d399",
         expense: "#f87171",
-        savings: "#60a5fa",
-        accent:  "#a78bfa",
+        savings: "#06b6d4",
+        accent:  "#06b6d4", // Cian brillante moderno como en el video
       },
     },
   },

@@ -23,7 +23,6 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
   })
   const [typeFilter, setTypeFilter] = useState("all")
 
-  // Filtrado compuesto: Mes + Tipo (Ingreso / Gasto)
   const filtered = useMemo(() => {
     let result = filterTransactionsByMonth(transactions, selectedMonth)
     if (typeFilter !== "all") {
@@ -33,17 +32,16 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
   }, [transactions, selectedMonth, typeFilter])
 
   return (
-    <div className="fade-up">
-      <div className="flex flex-wrap justify-between items-center gap-3 mb-5">
+    <div className="fade-up space-y-5">
+      <div className="flex flex-wrap justify-between items-center gap-4">
         <div>
-          <h2 className="text-xl font-bold">Transacciones</h2>
-          <p className="text-xs text-muted">
-            {filtered.length} movimiento{filtered.length !== 1 ? "s" : ""}
+          <h2 className="text-2xl font-bold tracking-tight text-white">Transacciones</h2>
+          <p className="text-xs text-white/50 mt-0.5">
+            {filtered.length} movimiento{filtered.length !== 1 ? "s" : ""} registrado{filtered.length !== 1 ? "s" : ""}
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Selector de Mes */}
+        <div className="flex flex-wrap items-center gap-2.5">
           <MonthSelector
             value={selectedMonth}
             onChange={setSelectedMonth}
@@ -51,16 +49,15 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
             showAllOption={true}
           />
 
-          {/* Filtro de Tipo */}
-          <div className="flex gap-1 bg-card border border-border rounded-xl p-1">
+          <div className="flex gap-1 glass-card p-1 rounded-xl">
             {Object.entries(FILTERS).map(([key, label]) => (
               <button
                 key={key}
                 onClick={() => setTypeFilter(key)}
-                className={`px-2.5 sm:px-3 py-1 rounded-lg text-xs transition-all ${
+                className={`px-3 py-1 rounded-lg text-xs transition-all ${
                   typeFilter === key
-                    ? "bg-accent text-black font-semibold"
-                    : "text-muted hover:text-text"
+                    ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-semibold"
+                    : "text-white/40 hover:text-white"
                 }`}
               >
                 {label}
@@ -70,25 +67,25 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
         </div>
       </div>
 
-      {/* Mobile: card list */}
-      <div className="sm:hidden bg-card border border-border rounded-2xl overflow-hidden divide-y divide-border">
+      {/* Lista Móvil */}
+      <div className="sm:hidden glass-card rounded-2xl overflow-hidden divide-y divide-white/5">
         {filtered.length === 0 ? (
-          <p className="px-4 py-12 text-center text-muted text-sm">
-            No hay transacciones en este periodo.
+          <p className="px-4 py-12 text-center text-white/40 text-xs">
+            No hay transacciones registradas en este periodo.
           </p>
         ) : (
           filtered.map((t) => (
-            <div key={t.id} className="flex items-center justify-between px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{t.description}</p>
-                <p className="text-xs text-muted mt-0.5">
-                  {t.date} · {t.category}
+            <div key={t.id} className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.02]">
+              <div className="flex-1 min-w-0 pr-3">
+                <p className="text-xs font-semibold text-white truncate">{t.description}</p>
+                <p className="text-[10px] text-white/40 mt-0.5">
+                  {t.date} · <span className="text-white/60">{t.category}</span>
                 </p>
               </div>
-              <div className="flex items-center gap-3 ml-3 shrink-0">
+              <div className="flex items-center gap-3 shrink-0">
                 <span
-                  className={`text-sm font-mono font-semibold ${
-                    t.type === "income" ? "text-income" : "text-expense"
+                  className={`text-xs font-mono font-bold ${
+                    t.type === "income" ? "text-emerald-400" : "text-rose-400"
                   }`}
                 >
                   {t.type === "income" ? "+" : ""}
@@ -96,7 +93,7 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
                 </span>
                 <button
                   onClick={() => onDelete(t.id)}
-                  className="text-muted hover:text-expense text-lg leading-none transition-colors"
+                  className="w-6 h-6 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors text-base"
                 >
                   ×
                 </button>
@@ -106,15 +103,15 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
         )}
       </div>
 
-      {/* Desktop: table */}
-      <div className="hidden sm:block bg-card border border-border rounded-2xl overflow-hidden">
+      {/* Tabla Desktop */}
+      <div className="hidden sm:block glass-card rounded-2xl overflow-hidden">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-surface">
+            <tr className="border-b border-white/5 bg-white/[0.02]">
               {["Fecha", "Descripción", "Categoría", "Importe", ""].map((h, i) => (
                 <th
                   key={i}
-                  className={`px-4 py-3 text-xs text-muted font-semibold uppercase tracking-wide border-b border-border ${
+                  className={`px-5 py-3.5 text-[11px] text-white/40 font-semibold uppercase tracking-wider ${
                     i === 3 ? "text-right" : "text-left"
                   }`}
                 >
@@ -123,11 +120,11 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-white/5">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-muted text-sm">
-                  No hay transacciones en este periodo.
+                <td colSpan={5} className="px-4 py-14 text-center text-white/40 text-xs">
+                  No hay transacciones registradas en este periodo.
                 </td>
               </tr>
             ) : (

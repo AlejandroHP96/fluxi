@@ -33,7 +33,6 @@ export const ImportStatementModal = ({ onClose, onImport }: ImportStatementModal
       const isCsv = file.name.endsWith(".csv") || file.type === "text/csv"
 
       if (isCsv) {
-        // Parseo instantáneo y privado en cliente
         const text = await file.text()
         const parsed = parseRevolutCsv(text)
         if (parsed.length === 0) {
@@ -41,7 +40,6 @@ export const ImportStatementModal = ({ onClose, onImport }: ImportStatementModal
         }
         setPreviewTxs(parsed)
       } else if (isPdf) {
-        // Parseo mediante Vercel Serverless + Gemini 3.1 Flash Lite
         const reader = new FileReader()
         const base64Promise = new Promise<string>((resolve, reject) => {
           reader.onload = () => resolve(reader.result as string)
@@ -100,18 +98,23 @@ export const ImportStatementModal = ({ onClose, onImport }: ImportStatementModal
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-card border border-border rounded-2xl p-5 sm:p-7 w-full max-w-lg my-auto max-h-[90vh] flex flex-col">
-        {/* Cabecera */}
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="glass-panel border border-white/10 rounded-3xl p-6 sm:p-7 w-full max-w-lg my-auto max-h-[92vh] flex flex-col shadow-2xl">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
-            <Upload className="w-5 h-5 text-accent" />
-            <h3 className="text-base font-semibold">Importar extracto de Revolut</h3>
+            <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+              <Upload className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">Importar extracto</h3>
+              <p className="text-[11px] text-white/40">Revolut (.CSV o .PDF)</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
+          <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 text-lg leading-none transition-colors">
+            ×
+          </button>
         </div>
 
-        {/* Zona de subida */}
         <div className="mb-4">
           <input
             ref={fileInputRef}
@@ -125,21 +128,21 @@ export const ImportStatementModal = ({ onClose, onImport }: ImportStatementModal
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={parsing || saving}
-            className="w-full py-6 px-4 rounded-xl border border-dashed border-border hover:border-accent flex flex-col items-center justify-center gap-2 transition-colors bg-surface/40 hover:bg-surface/70"
+            className="w-full py-7 px-4 rounded-2xl border border-dashed border-white/10 hover:border-cyan-500/40 flex flex-col items-center justify-center gap-2.5 transition-all bg-white/[0.02] hover:bg-white/[0.05]"
           >
             {parsing ? (
               <>
-                <Loader2 className="w-6 h-6 animate-spin text-accent" />
-                <span className="text-xs text-text font-medium">Analizando extracto {fileName}...</span>
+                <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                <span className="text-xs text-white font-medium">Analizando {fileName}...</span>
               </>
             ) : (
               <>
-                <div className="flex gap-2 text-accent">
-                  <FileSpreadsheet className="w-5 h-5" />
-                  <FileText className="w-5 h-5" />
+                <div className="flex gap-2 text-cyan-400">
+                  <FileSpreadsheet className="w-6 h-6" />
+                  <FileText className="w-6 h-6" />
                 </div>
-                <div className="text-xs font-semibold text-text">Selecciona tu extracto (.CSV o .PDF)</div>
-                <div className="text-[11px] text-muted text-center max-w-xs">
+                <div className="text-xs font-semibold text-white">Arrastra o haz clic para subir</div>
+                <div className="text-[11px] text-white/40 text-center max-w-xs">
                   Revolut: Perfil &gt; Extractos &gt; Descargar como Excel/CSV o PDF
                 </div>
               </>
@@ -148,39 +151,38 @@ export const ImportStatementModal = ({ onClose, onImport }: ImportStatementModal
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-expense/10 border border-expense/20 flex items-center gap-2 text-xs text-expense">
+          <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-2 text-xs text-rose-300">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {successCount !== null && (
-          <div className="mb-4 p-3 rounded-lg bg-income/10 border border-income/20 flex items-center gap-2 text-xs text-income font-medium">
+          <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-2 text-xs text-emerald-300 font-medium">
             <Check className="w-4 h-4 shrink-0" />
             <span>¡Importadas {successCount} transacciones correctamente!</span>
           </div>
         )}
 
-        {/* Vista previa de transacciones detectadas */}
         {previewTxs.length > 0 && (
           <div className="flex-1 min-h-0 flex flex-col">
             <div className="flex justify-between items-center mb-2 text-xs">
-              <span className="font-semibold text-text">Vista previa ({previewTxs.length} movimientos)</span>
-              <span className="text-muted text-[11px]">Revisa antes de confirmar</span>
+              <span className="font-semibold text-white">Vista previa ({previewTxs.length} movimientos)</span>
+              <span className="text-white/40 text-[11px]">Revisa antes de guardar</span>
             </div>
 
-            <div className="overflow-y-auto max-h-56 border border-border rounded-lg divide-y divide-border/50 bg-surface/30">
+            <div className="overflow-y-auto max-h-56 border border-white/10 rounded-xl divide-y divide-white/5 bg-black/20">
               {previewTxs.map((tx, idx) => (
-                <div key={idx} className="p-2.5 flex items-center justify-between text-xs hover:bg-surface/50">
+                <div key={idx} className="p-2.5 flex items-center justify-between text-xs hover:bg-white/[0.02]">
                   <div className="min-w-0 pr-2">
-                    <div className="font-medium text-text truncate">{tx.description}</div>
-                    <div className="text-[10px] text-muted flex gap-2">
+                    <div className="font-medium text-white truncate text-xs">{tx.description}</div>
+                    <div className="text-[10px] text-white/40 flex gap-2 mt-0.5">
                       <span>{tx.date}</span>
                       <span>•</span>
-                      <span>{tx.category}</span>
+                      <span className="text-white/60">{tx.category}</span>
                     </div>
                   </div>
-                  <div className={`font-mono font-bold shrink-0 ${tx.amount > 0 ? "text-income" : "text-expense"}`}>
+                  <div className={`font-mono font-bold shrink-0 text-xs ${tx.amount > 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {tx.amount > 0 ? "+" : ""}{tx.amount.toFixed(2)} €
                   </div>
                 </div>
@@ -190,13 +192,13 @@ export const ImportStatementModal = ({ onClose, onImport }: ImportStatementModal
             <button
               onClick={handleConfirmImport}
               disabled={saving}
-              className="mt-4 w-full py-2.5 rounded-lg text-sm font-bold bg-accent text-black hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+              className="mt-4 w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 transition-all shadow-md shadow-cyan-500/20 disabled:opacity-50"
             >
               {saving ? (
-                <>
+                <div className="flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   <span>Guardando {previewTxs.length} movimientos...</span>
-                </>
+                </div>
               ) : (
                 <span>Confirmar e importar {previewTxs.length} movimientos</span>
               )}
