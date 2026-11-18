@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react"
+import { Trash2 } from "lucide-react"
 import TransactionRow from "../components/transactions/TransactionRow"
 import { MonthSelector } from "../components/ui/MonthSelector"
 import { fmtDec } from "../utils/formatters"
@@ -14,9 +15,11 @@ const FILTERS: Record<string, string> = {
 interface TransactionsProps {
   transactions: Transaction[]
   onDelete: (id: string) => Promise<boolean>
+  onDeleteAll?: () => Promise<boolean>
 }
 
-const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
+const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps) => {
+  const [deletingAll, setDeletingAll] = useState(false)
   const monthOptions = useMemo(() => getAvailableMonths(transactions), [transactions])
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     return monthOptions[0]?.key || "all"
@@ -42,6 +45,24 @@ const Transactions = ({ transactions, onDelete }: TransactionsProps) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {onDeleteAll && transactions.length > 0 && (
+            <button
+              onClick={async () => {
+                if (window.confirm(`¿Estás seguro de que quieres eliminar TODOS los datos (${transactions.length} transacciones)? Esta acción no se puede deshacer.`)) {
+                  setDeletingAll(true)
+                  await onDeleteAll()
+                  setDeletingAll(false)
+                }
+              }}
+              disabled={deletingAll}
+              title="Borrar todas las transacciones de la cuenta"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-rose-500/20 bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-medium transition-all disabled:opacity-50"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>{deletingAll ? "Borrando..." : "Borrar todo"}</span>
+            </button>
+          )}
+
           <MonthSelector
             value={selectedMonth}
             onChange={setSelectedMonth}

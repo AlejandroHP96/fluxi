@@ -13,7 +13,7 @@ import { resetDemoData } from "./lib/demoData"
 
 const App = () => {
   const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
-  const { transactions, loading: txLoading, addTransaction, addBatchTransactions, deleteTransaction, totals } = useTransactions(user?.uid)
+  const { transactions, loading: txLoading, addTransaction, addBatchTransactions, deleteTransaction, deleteAllTransactions, totals } = useTransactions(user?.uid)
   const [activeTab, setActiveTab] = useState("overview")
   const [showModal, setShowModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
@@ -40,7 +40,7 @@ const App = () => {
 
   const pages: Record<string, JSX.Element> = {
     overview:     <Overview     transactions={transactions} totals={totals} />,
-    transactions: <Transactions transactions={transactions} onDelete={deleteTransaction} />,
+    transactions: <Transactions transactions={transactions} onDelete={deleteTransaction} onDeleteAll={deleteAllTransactions} />,
     analytics:    <Analytics    transactions={transactions} totals={totals} />,
   }
 
