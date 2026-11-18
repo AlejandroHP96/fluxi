@@ -1,4 +1,8 @@
-const pdf = require("pdf-parse/lib/pdf-parse.js")
+// Cargar pdf-parse dinámicamente evitando el archivo de test con require()
+const getPdfParser = async () => {
+  const mod = await import("pdf-parse/lib/pdf-parse.js")
+  return mod.default || mod
+}
 
 export const config = {
   runtime: "nodejs",
@@ -69,7 +73,8 @@ export default async function handler(req: any, res: any) {
     const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, "")
     const buffer = Buffer.from(cleanBase64, "base64")
 
-    const data = await pdf(buffer)
+    const parsePdf = await getPdfParser()
+    const data = await parsePdf(buffer)
     const text = data.text || ""
     const lines = text.split("\n")
 
