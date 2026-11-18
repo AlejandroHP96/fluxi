@@ -66,7 +66,7 @@ const App = () => {
 
       {/* 2. Área de Contenido Principal */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar con buscador ⌘K, selector de mes y perfil */}
+        {/* Topbar con buscador ⌘K y selector de mes */}
         <Topbar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -75,9 +75,6 @@ const App = () => {
           monthOptions={monthOptions}
           onAdd={() => setShowModal(true)}
           onImport={() => setShowImportModal(true)}
-          userEmail={user.email}
-          photoUrl={photoUrl}
-          onUpdateAvatar={updateAvatar}
         />
 
         {/* Barra de pestañas móvil en parte superior */}
