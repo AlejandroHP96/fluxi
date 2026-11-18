@@ -12,16 +12,37 @@ export const fmtDec = (n: number): string =>
   }).format(n)
 
 export const buildMonthlyData = (txs: Transaction[], months: string[]): MonthlyData[] => {
-  const map: Record<string, MonthlyData> = {}
-  txs.forEach((t) => {
-    const d     = new Date(t.date)
-    const key   = `${d.getFullYear()}-${d.getMonth()}`
-    const label = months[d.getMonth()]
-    if (!map[key]) map[key] = { label, income: 0, expense: 0, savings: 0 }
-    if (t.type === "income")  map[key].income  += Number(t.amount)
+  // Ordenar transacciones por fecha ascendente para procesar cronológicamente
+  const sorted = [...txs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+  const map: Record<string, { label: string; income: number; expense: number; year: number; month: number }> = {}
+
+  sorted.forEach((t) => {
+    const d = new Date(t.date)
+    if (isNaN(d.getTime())) return
+    const year = d.getFullYear()
+    const month = d.getMonth()
+    const key = `${year}-${String(month).padStart(2, "0")}`
+    const label = `${months[month]} ${String(year).slice(-2)}`
+
+    if (!map[key]) {
+      map[key] = { label, income: 0, expense: 0, year, month }
+    }
+    if (t.type === "income") map[key].income += Number(t.amount)
     if (t.type === "expense") map[key].expense += Math.abs(Number(t.amount))
   })
-  return Object.values(map).map((m) => ({ ...m, savings: m.income - m.expense }))
+
+  // Ordenar cronológicamente las claves YYYY-MM
+  return Object.keys(map)
+    .sort()
+    .map((k) => {
+      const m = map[k]
+      return {
+        label: m.label,
+        income: m.income,
+        expense: m.expense,
+        savings: m.income - m.expense,
+      }
+    })
 }
 
 export const buildCategoryData = (txs: Transaction[]): CategoryData[] => {
