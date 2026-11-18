@@ -1,4 +1,4 @@
-import pdf from "pdf-parse"
+const pdf = require("pdf-parse/lib/pdf-parse.js")
 
 export const config = {
   runtime: "nodejs",
