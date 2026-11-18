@@ -229,7 +229,13 @@ const Overview = ({ transactions }: OverviewProps) => {
                 >
                   <div className="min-w-0 pr-3">
                     <p className="font-medium text-xs text-white truncate">{t.description}</p>
-                    <p className="text-[10px] text-white/40 mt-0.5">{t.date} · {t.category}</p>
+                    <p className="text-[10px] text-white/40 mt-0.5">
+                      <span className="text-white/70">{t.date.split(" ")[0]}</span>
+                      {t.date.includes(" ") && (
+                        <span className="text-cyan-400/80 ml-1.5 font-mono">{t.date.split(" ")[1]}</span>
+                      )}
+                      {" "}· {t.category}
+                    </p>
                   </div>
                   <span
                     className={`font-mono text-xs font-bold shrink-0 ${

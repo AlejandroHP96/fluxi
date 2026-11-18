@@ -42,32 +42,44 @@ export function guessCategory(description: string, isIncome: boolean): string {
 }
 
 /**
- * Parsea fechas en distintos formatos comunes de extractos bancarios a YYYY-MM-DD
+ * Parsea fechas y horas de extractos bancarios a formato YYYY-MM-DD HH:mm (o YYYY-MM-DD si no hay hora)
  */
 export function normalizeDate(str: string): string {
-  if (!str) return new Date().toISOString().split("T")[0]
+  if (!str) return new Date().toISOString().slice(0, 16).replace("T", " ")
 
   const trimmed = str.trim()
 
-  // 1. Formato YYYY-MM-DD o YYYY/MM/DD
+  // 1. Formato YYYY-MM-DD HH:mm(:ss)?
+  const mIsoTime = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})\s+(\d{1,2}):(\d{2})/)
+  if (mIsoTime) {
+    return `${mIsoTime[1]}-${mIsoTime[2].padStart(2, "0")}-${mIsoTime[3].padStart(2, "0")} ${mIsoTime[4].padStart(2, "0")}:${mIsoTime[5]}`
+  }
+
+  // 2. Formato DD/MM/YYYY HH:mm(:ss)?
+  const mEuTime = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})\s+(\d{1,2}):(\d{2})/)
+  if (mEuTime) {
+    return `${mEuTime[3]}-${mEuTime[2].padStart(2, "0")}-${mEuTime[1].padStart(2, "0")} ${mEuTime[4].padStart(2, "0")}:${mEuTime[5]}`
+  }
+
+  // 3. Formato solo fecha YYYY-MM-DD
   const mIso = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
   if (mIso) {
     return `${mIso[1]}-${mIso[2].padStart(2, "0")}-${mIso[3].padStart(2, "0")}`
   }
 
-  // 2. Formato DD/MM/YYYY o DD-MM-YYYY (muy habitual en ES)
+  // 4. Formato solo fecha DD/MM/YYYY
   const mEu = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/)
   if (mEu) {
     return `${mEu[3]}-${mEu[2].padStart(2, "0")}-${mEu[1].padStart(2, "0")}`
   }
 
-  // 3. Fallback con Date constructor
+  // 5. Fallback con Date constructor
   const parsed = new Date(trimmed)
   if (!isNaN(parsed.getTime())) {
-    return parsed.toISOString().split("T")[0]
+    return parsed.toISOString().slice(0, 16).replace("T", " ")
   }
 
-  return new Date().toISOString().split("T")[0]
+  return new Date().toISOString().slice(0, 16).replace("T", " ")
 }
 
 /**

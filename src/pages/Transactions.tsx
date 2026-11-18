@@ -135,7 +135,11 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
               <div className="flex-1 min-w-0 pr-3">
                 <p className="text-xs font-semibold text-white truncate">{t.description}</p>
                 <p className="text-[10px] text-white/40 mt-0.5">
-                  {t.date} · <span className="text-white/60">{t.category}</span>
+                  <span className="text-white/70">{t.date.split(" ")[0]}</span>
+                  {t.date.includes(" ") && (
+                    <span className="text-cyan-400/80 ml-1.5 font-mono">{t.date.split(" ")[1]}</span>
+                  )}
+                  {" "}· <span className="text-white/60">{t.category}</span>
                 </p>
               </div>
               <div className="flex items-center gap-3 shrink-0">
