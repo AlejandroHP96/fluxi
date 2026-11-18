@@ -140,7 +140,10 @@ export const DashboardOverview = ({
                 <CartesianGrid stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" tick={{ fill: "rgba(255, 255, 255, 0.4)", fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "rgba(255, 255, 255, 0.4)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v / 1000}k€`} />
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip 
+                  content={<CustomTooltip />} 
+                  cursor={{ stroke: "rgba(255, 255, 255, 0.15)", strokeWidth: 1 }} 
+                />
                 <Legend wrapperStyle={{ fontSize: 11, color: "rgba(255, 255, 255, 0.5)" }} />
                 <Area type="monotone" dataKey="income" name="Ingresos" stroke="#06b6d4" strokeWidth={2.5} fill="url(#mainCyan)" dot={false} />
                 <Area type="monotone" dataKey="expense" name="Gastos" stroke="#f43f5e" strokeWidth={2.5} fill="url(#mainRose)" dot={false} />

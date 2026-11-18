@@ -15,10 +15,12 @@ interface CustomTooltipProps {
 const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
   if (!active || !payload?.length) return null
   return (
-    <div className="bg-card border border-border rounded-xl px-4 py-3 text-sm">
-      <p className="text-muted font-mono mb-2">{label}</p>
+    <div className="glass-panel rounded-xl px-4 py-3 text-xs shadow-2xl border border-white/15 backdrop-blur-xl">
+      <p className="text-white/60 font-medium mb-1.5">{label}</p>
       {payload.map((p, i) => (
-        <p key={i} style={{ color: p.color }} className="my-0.5">{p.name}: {fmt(p.value)}</p>
+        <p key={i} style={{ color: p.color || "#06b6d4" }} className="my-0.5 font-semibold">
+          {p.name}: {fmt(p.value)}
+        </p>
       ))}
     </div>
   )

@@ -35,7 +35,10 @@ const Analytics = ({ transactions, totals }: AnalyticsProps) => {
             <CartesianGrid stroke="rgba(255, 255, 255, 0.05)" strokeDasharray="3 3" vertical={false} />
             <XAxis dataKey="label" tick={{ fill: "rgba(255, 255, 255, 0.4)", fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: "rgba(255, 255, 255, 0.4)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v: number) => `${v}€`} />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip 
+              content={<CustomTooltip />} 
+              cursor={{ fill: "rgba(255, 255, 255, 0.05)" }} 
+            />
             <Bar dataKey="savings" name="Ahorro" radius={[8, 8, 0, 0]}>
               {monthly.map((m, i) => (
                 <Cell key={i} fill={m.savings >= 0 ? "#06b6d4" : "#f43f5e"} />
