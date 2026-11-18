@@ -210,12 +210,12 @@ export const DashboardOverview = ({
         </div>
       </div>
 
-      {/* 3. Bento Grid - Fila 3: Tabla de Actividad Reciente / Transacciones destacadas */}
-      <div className="glass-card rounded-2xl p-5 sm:p-6">
-        <div className="flex justify-between items-center mb-5">
+      {/* 3. Bento Grid - Fila 3: Movimientos Recientes (Cards en móvil, tabla en Desktop) */}
+      <div className="glass-card rounded-2xl p-4 sm:p-6">
+        <div className="flex justify-between items-center mb-4 sm:mb-5">
           <div>
-            <h3 className="text-base font-bold text-white tracking-tight">Actividad Reciente</h3>
-            <p className="text-xs text-white/40">Últimos movimientos del periodo</p>
+            <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">Actividad Reciente</h3>
+            <p className="text-[11px] sm:text-xs text-white/40">Últimos movimientos del periodo</p>
           </div>
           <button
             onClick={onViewAllTransactions}
@@ -229,41 +229,71 @@ export const DashboardOverview = ({
         {recent.length === 0 ? (
           <p className="text-white/40 text-xs py-10 text-center">No hay transacciones en este periodo.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b border-white/5 bg-white/[0.01]">
-                  <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-left">Fecha y Hora</th>
-                  <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-left">Comercio / Concepto</th>
-                  <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-left">Categoría</th>
-                  <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-right">Importe</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {recent.map((t) => (
-                  <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="px-4 py-3 text-xs whitespace-nowrap">
-                      <span className="text-white/80">{t.date.split(" ")[0]}</span>
+          <>
+            {/* Vista Móvil: Lista limpia tipo Card sin scroll horizontal */}
+            <div className="sm:hidden divide-y divide-white/5">
+              {recent.map((t) => (
+                <div key={t.id} className="py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-white truncate">{t.description}</p>
+                    <div className="text-[10px] text-white/40 flex items-center gap-1.5 mt-0.5">
+                      <span>{t.date.split(" ")[0]}</span>
                       {t.date.includes(" ") && (
-                        <span className="text-cyan-400/80 text-[11px] ml-2 font-mono">{t.date.split(" ")[1]}</span>
+                        <span className="text-cyan-400 font-mono">{t.date.split(" ")[1]}</span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-xs font-medium text-white">{t.description}</td>
-                    <td className="px-4 py-3 text-xs">
-                      <span className="px-2.5 py-0.5 rounded-full text-[11px] bg-white/[0.04] border border-white/5 text-white/70">
-                        {t.category}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-right font-mono font-bold whitespace-nowrap">
-                      <span className={t.type === "income" ? "text-emerald-400" : "text-rose-400"}>
-                        {t.type === "income" ? "+" : ""}{fmtDec(t.amount)}
-                      </span>
-                    </td>
+                      <span>•</span>
+                      <span className="text-white/60 truncate">{t.category}</span>
+                    </div>
+                  </div>
+                  <div
+                    className={`text-xs font-mono font-bold shrink-0 text-right ${
+                      t.type === "income" ? "text-emerald-400" : "text-rose-400"
+                    }`}
+                  >
+                    {t.type === "income" ? "+" : ""}
+                    {fmtDec(t.amount)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista Desktop: Tabla tradicional amplia */}
+            <div className="hidden sm:block overflow-hidden">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="border-b border-white/5 bg-white/[0.01]">
+                    <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-left">Fecha y Hora</th>
+                    <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-left">Comercio / Concepto</th>
+                    <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-left">Categoría</th>
+                    <th className="px-4 py-3 text-[11px] text-white/40 font-semibold uppercase tracking-wider text-right">Importe</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {recent.map((t) => (
+                    <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
+                      <td className="px-4 py-3 text-xs whitespace-nowrap">
+                        <span className="text-white/80">{t.date.split(" ")[0]}</span>
+                        {t.date.includes(" ") && (
+                          <span className="text-cyan-400/80 text-[11px] ml-2 font-mono">{t.date.split(" ")[1]}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs font-medium text-white">{t.description}</td>
+                      <td className="px-4 py-3 text-xs">
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] bg-white/[0.04] border border-white/5 text-white/70">
+                          {t.category}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-right font-mono font-bold whitespace-nowrap">
+                        <span className={t.type === "income" ? "text-emerald-400" : "text-rose-400"}>
+                          {t.type === "income" ? "+" : ""}{fmtDec(t.amount)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
