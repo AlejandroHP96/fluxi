@@ -66,7 +66,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    const { pdfBase64 } = req.body || {}
+    const { pdfBase64, fileName } = req.body || {}
     if (!pdfBase64) {
       return res.status(400).json({ error: "Falta el documento PDF" })
     }
@@ -78,6 +78,21 @@ export default async function handler(req: any, res: any) {
     const data = await parsePdf(buffer)
     const text = data.text || ""
     const lines = text.split("\n")
+
+    // Periodo del extracto: las fechas de las compras ("DD.MM") no llevan año, el cliente lo deduce
+    // a partir de esto. 1º la cabecera del PDF ("Noviembre'26"), 2º el nombre ("2026_11_extracto_digital.pdf").
+    // Si no hay ninguno se devuelve null y el cliente pregunta el mes al usuario.
+    const MONTHS = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+    let period: { month: number; year: number; source: "cabecera" | "nombre" } | null = null
+    const header = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s*'\s*(\d{2})/i)
+    if (header) {
+      period = { month: MONTHS.indexOf(header[1].toLowerCase()) + 1, year: 2000 + Number(header[2]), source: "cabecera" }
+    } else {
+      const fromName = String(fileName || "").match(/(20\d{2})[_\-.]?(\d{2})(?!\d)/)
+      if (fromName && +fromName[2] >= 1 && +fromName[2] <= 12) {
+        period = { month: +fromName[2], year: +fromName[1], source: "nombre" }
+      }
+    }
 
     const items: Array<{
       dateShort: string
@@ -121,6 +136,7 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({
       items,
       count: items.length,
+      period,
     })
   } catch (error: any) {
     console.error("Error al procesar PDF de Ventajón localmente:", error)

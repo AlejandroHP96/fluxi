@@ -10,7 +10,7 @@ interface ImportStatementModalProps {
   existingTransactions?: Transaction[]
 }
 
-type Step = "upload_statement" | "ask_ventajon" | "upload_ventajon" | "done"
+type Step = "upload_statement" | "ask_ventajon" | "upload_ventajon" | "pick_month" | "done"
 
 const MAX_DAY_DIFF = 3
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -27,17 +27,11 @@ const parseTxDay = (date: string): Date | null => {
   return null
 }
 
-// Distancia en días entre la fecha del movimiento y un "DD.MM" de Ventajón (sin año;
-// se prueba el año del movimiento y los adyacentes por el cambio de año)
-const dayDiffToShortDate = (txDay: Date, dateShort: string): number => {
+// Distancia en días entre la fecha del movimiento y un "DD.MM" de Ventajón del año indicado
+const dayDiffToShortDate = (txDay: Date, dateShort: string, year: number): number => {
   const m = String(dateShort).match(/^(\d{1,2})\.(\d{1,2})$/)
   if (!m) return Infinity
-  const year = txDay.getUTCFullYear()
-  return Math.min(
-    ...[year - 1, year, year + 1].map((y) =>
-      Math.abs(txDay.getTime() - Date.UTC(y, +m[2] - 1, +m[1])) / DAY_MS
-    )
-  )
+  return Math.abs(txDay.getTime() - Date.UTC(year, +m[2] - 1, +m[1])) / DAY_MS
 }
 
 export const ImportStatementModal = ({
@@ -56,6 +50,10 @@ export const ImportStatementModal = ({
   const [ventajonCount, setVentajonCount] = useState<number>(0)
   const [updatedVentajonCount, setUpdatedVentajonCount] = useState<number | null>(null)
   const [pendingVentajonCount, setPendingVentajonCount] = useState(0)
+  const [pendingItems, setPendingItems] = useState<any[] | null>(null)
+  const [pickedMonth, setPickedMonth] = useState("") // "YYYY-MM"
+
+  const existingVentajonCount = existingTransactions.filter((t) => isVentajon(t.description)).length
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const ventajonFileInputRef = useRef<HTMLInputElement>(null)
@@ -176,7 +174,7 @@ export const ImportStatementModal = ({
       const res = await fetch("/api/parse-ventajon", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pdfBase64: base64 }),
+        body: JSON.stringify({ pdfBase64: base64, fileName: file.name }),
       })
 
       if (!res.ok) {
@@ -184,83 +182,117 @@ export const ImportStatementModal = ({
         throw new Error(err.error || "Fallo al procesar el PDF de Ventajón")
       }
 
-      const { items } = await res.json()
+      const { items, period } = await res.json()
       if (!items || items.length === 0) {
         throw new Error("No se encontraron compras en el extracto de Ventajón")
       }
 
-      // existingTransactions llega por props desde el onSnapshot de App.tsx, que ya incluye
-      // los movimientos recién importados (Firestore emite primero las escrituras locales).
-      const ventajonTxs = existingTransactions.filter((t) => isVentajon(t.description))
-
-      const usedItems = new Set<number>()
-      const updates: Array<{ id: string; description: string; category: string }> = []
-      const unmatched: Array<{ date: string; amount: number }> = []
-
-      for (const tx of ventajonTxs) {
-        const txAmt = Math.abs(Number(tx.amount))
-        const txDay = parseTxDay(tx.date)
-        if (!txDay) {
-          unmatched.push({ date: tx.date, amount: tx.amount })
-          continue
-        }
-
-        // Mismo importe y fecha más cercana (Revolut puede usar la fecha de liquidación,
-        // uno o varios días después de la compra en Ventajón).
-        let bestIdx = -1
-        let bestDiff = Infinity
-        items.forEach((it: any, idx: number) => {
-          if (usedItems.has(idx) || Math.abs(Number(it.amount) - txAmt) >= 0.01) return
-          const diff = dayDiffToShortDate(txDay, it.dateShort)
-          if (diff <= MAX_DAY_DIFF && diff < bestDiff) {
-            bestDiff = diff
-            bestIdx = idx
-          }
-        })
-
-        if (bestIdx !== -1) {
-          usedItems.add(bestIdx)
-          const matchedItem = items[bestIdx]
-          updates.push({
-            id: tx.id,
-            description: matchedItem.concept,
-            category: matchedItem.category,
-          })
-        } else {
-          unmatched.push({ date: tx.date, amount: tx.amount })
-        }
+      if (!period) {
+        // Ni cabecera ni nombre de archivo indican el mes: se le pregunta al usuario
+        setPendingItems(items)
+        setPickedMonth("")
+        setStep("pick_month")
+        return
       }
-
-      if (unmatched.length > 0) {
-        console.warn(
-          `[Ventajón] ${ventajonTxs.length} movimientos, ${updates.length} emparejados, ${unmatched.length} sin pareja`,
-          { unmatched: unmatched.slice(0, 10), items: items.slice(0, 10) }
-        )
-      }
-
-      if (updates.length > 0 && onUpdateBatch) {
-        const count = await onUpdateBatch(updates)
-        if (count === 0) {
-          throw new Error(`Se emparejaron ${updates.length} pagos, pero no se pudieron guardar los cambios`)
-        }
-        setUpdatedVentajonCount(count)
-      } else {
-        setUpdatedVentajonCount(0)
-      }
-
-      setPendingVentajonCount(unmatched.length)
-      setStep("done")
-      // Si quedan pendientes no se cierra solo, para que dé tiempo a leer el aviso
-      if (unmatched.length === 0) {
-        setTimeout(() => {
-          onClose()
-        }, 2500)
-      }
+      await matchAndSave(items, period)
     } catch (err: any) {
       setError(err?.message || "Error al leer el extracto de Ventajón")
     } finally {
       setParsing(false)
       if (ventajonFileInputRef.current) ventajonFileInputRef.current.value = ""
+    }
+  }
+
+  const handleConfirmMonth = async () => {
+    const m = pickedMonth.match(/^(\d{4})-(\d{2})$/)
+    if (!m || !pendingItems) return
+    setParsing(true)
+    setError(null)
+    try {
+      await matchAndSave(pendingItems, { year: +m[1], month: +m[2] })
+      setPendingItems(null)
+    } catch (err: any) {
+      setError(err?.message || "Error al emparejar el extracto de Ventajón")
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  // Empareja las compras del PDF con los pagos "Ventajon" guardados y guarda el comercio real
+  const matchAndSave = async (rawItems: any[], period: { year: number; month: number }) => {
+    // El extracto de un mes trae compras de ese mes y del anterior: un mes posterior al del
+    // extracto solo puede ser del año anterior (p. ej. diciembre en el extracto de enero).
+    const items = rawItems.map((it) => {
+      const month = Number(String(it.dateShort).split(".")[1])
+      return { ...it, year: month <= period.month ? period.year : period.year - 1 }
+    })
+
+    // existingTransactions llega por props desde el onSnapshot de App.tsx, que ya incluye
+    // los movimientos recién importados (Firestore emite primero las escrituras locales).
+    const ventajonTxs = existingTransactions.filter((t) => isVentajon(t.description))
+
+    const usedItems = new Set<number>()
+    const updates: Array<{ id: string; description: string; category: string }> = []
+    const unmatched: Array<{ date: string; amount: number }> = []
+
+    for (const tx of ventajonTxs) {
+      const txAmt = Math.abs(Number(tx.amount))
+      const txDay = parseTxDay(tx.date)
+      if (!txDay) {
+        unmatched.push({ date: tx.date, amount: tx.amount })
+        continue
+      }
+
+      // Mismo importe y fecha más cercana (Revolut puede usar la fecha de liquidación,
+      // uno o varios días después de la compra en Ventajón).
+      let bestIdx = -1
+      let bestDiff = Infinity
+      items.forEach((it: any, idx: number) => {
+        if (usedItems.has(idx) || Math.abs(Number(it.amount) - txAmt) >= 0.01) return
+        const diff = dayDiffToShortDate(txDay, it.dateShort, it.year)
+        if (diff <= MAX_DAY_DIFF && diff < bestDiff) {
+          bestDiff = diff
+          bestIdx = idx
+        }
+      })
+
+      if (bestIdx !== -1) {
+        usedItems.add(bestIdx)
+        const matchedItem = items[bestIdx]
+        updates.push({
+          id: tx.id,
+          description: matchedItem.concept,
+          category: matchedItem.category,
+        })
+      } else {
+        unmatched.push({ date: tx.date, amount: tx.amount })
+      }
+    }
+
+    if (unmatched.length > 0) {
+      console.warn(
+        `[Ventajón] ${ventajonTxs.length} movimientos, ${updates.length} emparejados, ${unmatched.length} sin pareja`,
+        { unmatched: unmatched.slice(0, 10), items: items.slice(0, 10) }
+      )
+    }
+
+    if (updates.length > 0 && onUpdateBatch) {
+      const count = await onUpdateBatch(updates)
+      if (count === 0) {
+        throw new Error(`Se emparejaron ${updates.length} pagos, pero no se pudieron guardar los cambios`)
+      }
+      setUpdatedVentajonCount(count)
+    } else {
+      setUpdatedVentajonCount(0)
+    }
+
+    setPendingVentajonCount(unmatched.length)
+    setStep("done")
+    // Si quedan pendientes no se cierra solo, para que dé tiempo a leer el aviso
+    if (unmatched.length === 0) {
+      setTimeout(() => {
+        onClose()
+      }, 2500)
     }
   }
 
@@ -276,7 +308,7 @@ export const ImportStatementModal = ({
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
-              {step === "ask_ventajon" || step === "upload_ventajon" ? (
+              {step === "ask_ventajon" || step === "upload_ventajon" || step === "pick_month" ? (
                 <Sparkles className="w-4 h-4 text-amber-400" />
               ) : (
                 <Upload className="w-4 h-4" />
@@ -284,12 +316,12 @@ export const ImportStatementModal = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white">
-                {step === "ask_ventajon" || step === "upload_ventajon"
+                {step === "ask_ventajon" || step === "upload_ventajon" || step === "pick_month"
                   ? "Desglose Ventajón"
                   : "Importar extracto"}
               </h3>
               <p className="text-[11px] text-white/40">
-                {step === "ask_ventajon" || step === "upload_ventajon"
+                {step === "ask_ventajon" || step === "upload_ventajon" || step === "pick_month"
                   ? "Enlazar comercios reales con tus pagos"
                   : "Revolut (.CSV o .PDF)"}
               </p>
@@ -340,6 +372,21 @@ export const ImportStatementModal = ({
                 )}
               </button>
             </div>
+
+            {/* Acceso directo: desglosar pagos ya importados sin subir otro extracto */}
+            {previewTxs.length === 0 && !parsing && existingVentajonCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setStep("upload_ventajon")}
+                className="mb-4 w-full p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 hover:border-amber-400/50 flex items-center justify-between gap-2 text-xs text-amber-200 transition-all"
+              >
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
+                  Desglosar Ventajón: {existingVentajonCount} pagos sin comercio
+                </span>
+                <ArrowRight className="w-3.5 h-3.5 shrink-0" />
+              </button>
+            )}
 
             {error && (
               <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-2 text-xs text-rose-300">
@@ -508,6 +555,54 @@ export const ImportStatementModal = ({
           </div>
         )}
 
+        {/* PASO 3b: El PDF no indica su mes (ni cabecera ni nombre de archivo) */}
+        {step === "pick_month" && (
+          <div className="space-y-4 py-2">
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200">
+              <p className="font-semibold text-sm mb-1 text-amber-300">¿De qué mes es este extracto?</p>
+              <p className="text-white/70 leading-relaxed">
+                No hemos podido leer el mes en el PDF. Indica el que aparece en el título del
+                extracto (por ejemplo, noviembre de 2026 para &quot;Noviembre&apos;26&quot;) para
+                emparejar cada compra con el año correcto.
+              </p>
+            </div>
+
+            <input
+              type="month"
+              value={pickedMonth}
+              onChange={(e) => setPickedMonth(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 focus:border-amber-400/60 outline-none text-sm text-white [color-scheme:dark]"
+            />
+
+            {error && (
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center gap-2 text-xs text-rose-300">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={parsing}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-white/60 hover:text-white"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmMonth}
+                disabled={!pickedMonth || parsing}
+                className="liquid-button px-5 py-2 rounded-xl text-xs font-bold text-slate-950 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {parsing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                <span>Emparejar</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* PASO 4: Éxito final */}
         {step === "done" && (
           <div className="py-8 flex flex-col items-center justify-center text-center gap-3">
@@ -531,6 +626,19 @@ export const ImportStatementModal = ({
                   {pendingVentajonCount} pagos de Ventajon siguen sin comercio: no aparecen en ese PDF.
                   Sube el extracto del mes siguiente cuando lo tengas.
                 </p>
+              )}
+              {pendingVentajonCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null)
+                    setStep("upload_ventajon")
+                  }}
+                  className="mt-4 px-4 py-2 rounded-xl border border-amber-500/30 hover:border-amber-400/60 bg-amber-500/[0.05] text-xs font-semibold text-amber-200 inline-flex items-center gap-1.5 transition-all"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Subir otro PDF de Ventajón
+                </button>
               )}
             </div>
           </div>
