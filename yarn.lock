@@ -1637,6 +1637,11 @@ pdf-parse@^2.4.5:
     "@napi-rs/canvas" "0.1.80"
     pdfjs-dist "5.4.296"
 
+pdf2json@^4.1.1:
+  version "4.1.1"
+  resolved "https://registry.npmjs.org/pdf2json/-/pdf2json-4.1.1.tgz"
+  integrity sha512-i5lJ+qhl2R4dO2+Jnd/yMlxML93Fgv3WUJ+UJl1L5//44R/4exMx2b0furEjHynUR5XCx8G0QyOqbngtyTa2Dw==
+
 pdfjs-dist@5.4.296:
   version "5.4.296"
   resolved "https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-5.4.296.tgz"
