@@ -1,5 +1,7 @@
-import { useState } from "react"
+import { useState, useRef, ChangeEvent } from "react"
+import { Camera, Loader2 } from "lucide-react"
 import { CATEGORIES } from "../../constants/categories"
+import { compressImage } from "../../utils/imageUtils"
 import type { NewTransaction, TransactionType } from "../../types"
 
 interface FormState {
@@ -24,12 +26,57 @@ interface AddTransactionModalProps {
 }
 
 const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
-  const [form, setForm]     = useState<FormState>(EMPTY)
-  const [saving, setSaving] = useState(false)
-  const [err, setErr]       = useState("")
+  const [form, setForm]         = useState<FormState>(EMPTY)
+  const [saving, setSaving]     = useState(false)
+  const [scanning, setScanning] = useState(false)
+  const [err, setErr]           = useState("")
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }))
+
+  const handleCapture = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setScanning(true)
+    setErr("")
+
+    try {
+      const base64DataUrl = await compressImage(file, 1200, 0.8)
+
+      const res = await fetch("/api/scan-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageBase64: base64DataUrl,
+          mimeType: "image/jpeg",
+        }),
+      })
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}))
+        throw new Error(errJson.error || "Fallo al escanear ticket")
+      }
+
+      const { data } = await res.json()
+
+      setForm((prev) => ({
+        ...prev,
+        type: "expense",
+        amount: data.amount ? String(data.amount) : prev.amount,
+        description: data.description || prev.description,
+        date: data.date || prev.date,
+        category: data.category && CATEGORIES.includes(data.category) ? data.category : prev.category,
+      }))
+    } catch (error: any) {
+      setErr(error.message || "No se pudo leer el ticket")
+    } finally {
+      setScanning(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+    }
+  }
 
   const handleSubmit = async () => {
     if (!form.description.trim() || !form.amount) {
@@ -59,10 +106,43 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center">
       <div className="bg-card border border-border rounded-2xl p-5 sm:p-7 w-full max-w-sm mx-4">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-4">
           <h3 className="text-base font-semibold">Nueva transacción</h3>
           <button onClick={onClose} className="text-muted hover:text-text text-xl leading-none">×</button>
         </div>
+
+        {/* Botón de cámara (abre la cámara trasera en móvil) */}
+        {form.type === "expense" && (
+          <div className="mb-4">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleCapture}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={scanning}
+              className="w-full py-2.5 px-3 rounded-lg border border-dashed border-border hover:border-accent text-xs font-medium text-text flex items-center justify-center gap-2 transition-colors bg-surface/50"
+            >
+              {scanning ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
+                  <span>Leyendo ticket con Gemini...</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-4 h-4 text-accent" />
+                  <span>Escanear ticket con cámara</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
         <div className="flex gap-2 mb-5">
           {(["expense", "income"] as TransactionType[]).map((t) => (
             <button key={t} onClick={() => set("type", t)}
@@ -100,10 +180,10 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
           </div>
         )}
         {err && <p className="text-expense text-xs mb-4">{err}</p>}
-        <button onClick={handleSubmit} disabled={saving}
+        <button onClick={handleSubmit} disabled={saving || scanning}
           className={`w-full py-2.5 rounded-lg text-sm font-bold transition-opacity ${
             form.type === "income" ? "bg-income" : "bg-accent"
-          } text-black ${saving ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
+          } text-black ${saving || scanning ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
           {saving ? "Guardando..." : "Añadir transacción"}
         </button>
       </div>
