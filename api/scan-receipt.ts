@@ -37,7 +37,7 @@ Extrae exclusivamente:
     const cleanBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, "")
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.8-flash",
+      model: "gemini-3.1-flash-lite",
       contents: [
         {
           role: "user",

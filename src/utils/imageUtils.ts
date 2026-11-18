@@ -2,7 +2,7 @@
  * Redimensiona y comprime una imagen tomada con la cámara a un tamaño ligero
  * apto para subir en móviles con bajo consumo de datos y sin superar límites.
  */
-export async function compressImage(file: File, maxDimension = 1200, quality = 0.8): Promise<string> {
+export async function compressImage(file: File, maxDimension = 900, quality = 0.65): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.src = URL.createObjectURL(file)
