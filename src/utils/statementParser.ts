@@ -42,6 +42,35 @@ export function guessCategory(description: string, isIncome: boolean): string {
 }
 
 /**
+ * Parsea fechas en distintos formatos comunes de extractos bancarios a YYYY-MM-DD
+ */
+export function normalizeDate(str: string): string {
+  if (!str) return new Date().toISOString().split("T")[0]
+
+  const trimmed = str.trim()
+
+  // 1. Formato YYYY-MM-DD o YYYY/MM/DD
+  const mIso = trimmed.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/)
+  if (mIso) {
+    return `${mIso[1]}-${mIso[2].padStart(2, "0")}-${mIso[3].padStart(2, "0")}`
+  }
+
+  // 2. Formato DD/MM/YYYY o DD-MM-YYYY (muy habitual en ES)
+  const mEu = trimmed.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/)
+  if (mEu) {
+    return `${mEu[3]}-${mEu[2].padStart(2, "0")}-${mEu[1].padStart(2, "0")}`
+  }
+
+  // 3. Fallback con Date constructor
+  const parsed = new Date(trimmed)
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString().split("T")[0]
+  }
+
+  return new Date().toISOString().split("T")[0]
+}
+
+/**
  * Parsea un CSV de Revolut exportado desde la app o web
  */
 export function parseRevolutCsv(csvText: string): NewTransaction[] {
@@ -54,11 +83,6 @@ export function parseRevolutCsv(csvText: string): NewTransaction[] {
   const transactions: NewTransaction[] = []
 
   for (const row of rows) {
-    // Columnas típicas de Revolut en ES o EN:
-    // Description | Descripción
-    // Amount | Importe
-    // Started Date | Completed Date | Fecha de inicio | Fecha de finalización
-    // State | Estado: COMPLETED | COMPLETADO
     const state = row["State"] || row["Estado"] || "COMPLETED"
     if (state && !/COMPLETED|COMPLETADO/i.test(state)) {
       continue
@@ -71,15 +95,7 @@ export function parseRevolutCsv(csvText: string): NewTransaction[] {
     const cleanAmount = parseFloat(rawAmount.replace(/[^0-9.-]/g, ""))
     if (isNaN(cleanAmount) || cleanAmount === 0) continue
 
-    // Normalizar fecha a YYYY-MM-DD
-    let formattedDate = new Date().toISOString().split("T")[0]
-    if (rawDate) {
-      const parsedDate = new Date(rawDate)
-      if (!isNaN(parsedDate.getTime())) {
-        formattedDate = parsedDate.toISOString().split("T")[0]
-      }
-    }
-
+    const formattedDate = normalizeDate(rawDate)
     const isIncome = cleanAmount > 0
     const type = isIncome ? "income" : "expense"
     const category = guessCategory(rawDesc, isIncome)
