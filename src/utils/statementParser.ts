@@ -73,7 +73,7 @@ export function normalizeDate(str: string): string {
 /**
  * Parsea un CSV de Revolut exportado desde la app o web
  */
-export function parseRevolutCsv(csvText: string): NewTransaction[] {
+export function parseRevolutCsv(csvText: string, ignoreSavingsTransfers = true): NewTransaction[] {
   const result = Papa.parse(csvText, {
     header: true,
     skipEmptyLines: true,
@@ -91,6 +91,16 @@ export function parseRevolutCsv(csvText: string): NewTransaction[] {
     const rawDesc = row["Description"] || row["Descripción"] || row["Concepto"] || ""
     const rawAmount = row["Amount"] || row["Importe"] || "0"
     const rawDate = row["Completed Date"] || row["Started Date"] || row["Fecha de finalización"] || row["Fecha de inicio"] || row["Date"] || row["Fecha"] || ""
+
+    // Filtrar traspasos internos a/desde la cuenta de ahorro de Revolut
+    // Ejemplos: "A EUR Ahorros", "Desde EUR Ahorros", "To EUR Savings", "From EUR Savings", "Vault", etc.
+    if (ignoreSavingsTransfers) {
+      const isSavingTransfer = /^(A|Desde|To|From)\s+.*(Ahorros|Savings|Vault|Pocket|Bolsillo)/i.test(rawDesc) ||
+        /\b(Ahorros|Vault|Pocket)\b/i.test(rawDesc) && /^(A|Desde|To|From)\s+/i.test(rawDesc)
+      if (isSavingTransfer) {
+        continue
+      }
+    }
 
     const cleanAmount = parseFloat(rawAmount.replace(/[^0-9.-]/g, ""))
     if (isNaN(cleanAmount) || cleanAmount === 0) continue

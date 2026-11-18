@@ -34,7 +34,11 @@ Extrae TODAS las transacciones completadas como una lista JSON con:
 - amount: número positivo para ingresos y negativo para gastos (ejemplo: -14.20 o 1200.00).
 - date: fecha en formato YYYY-MM-DD.
 - type: "expense" si amount es negativo o "income" si amount es positivo.
-- category: una de las siguientes opciones: ${CATEGORIES.join(", ")}. Si es ingreso pon "Ingresos", si no encaja pon "Otro".`
+- category: una de las siguientes opciones: ${CATEGORIES.join(", ")}. Si es ingreso pon "Ingresos", si no encaja pon "Otro".
+
+REGLA MUY IMPORTANTE:
+- IGNORA y NO incluyas los traspasos internos entre la cuenta y la cuenta de ahorro (ejemplos: "A EUR Ahorros", "Desde EUR Ahorros", "To Savings", "From Savings", "Vault").
+- SÍ incluye las transferencias bancarias normales y las de personas (ejemplo: "Transferencia de Alejandro", "Transferencia a Alejandro").`
 
     const response = await ai.models.generateContent({
       model: "gemini-3.1-flash-lite",
