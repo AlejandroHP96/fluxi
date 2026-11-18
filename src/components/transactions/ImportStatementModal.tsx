@@ -240,6 +240,9 @@ export const ImportStatementModal = ({
 
       if (updates.length > 0 && onUpdateBatch) {
         const count = await onUpdateBatch(updates)
+        if (count === 0) {
+          throw new Error(`Se emparejaron ${updates.length} pagos, pero no se pudieron guardar los cambios`)
+        }
         setUpdatedVentajonCount(count)
       } else {
         setUpdatedVentajonCount(0)

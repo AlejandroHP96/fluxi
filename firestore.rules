@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'alejandroherrepes@gmail.com';
+    }
+    function isDemo(uid) {
+      return uid == 'jTQDmVrbmDSX657q7Of8E0O0EfK2';
+    }
+    match /transactions/{id} {
+      allow read: if request.auth != null
+        && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)));
+      allow create: if request.auth != null
+        && (request.resource.data.userId == request.auth.uid || (isAdmin() && isDemo(request.resource.data.userId)));
+      allow delete: if request.auth != null
+        && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)));
+      // Solo renombrar/recategorizar (desglose de Ventajón); el dueño no puede cambiar
+      allow update: if request.auth != null
+        && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'category']);
+    }
+  }
+}
