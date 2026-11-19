@@ -101,7 +101,7 @@ export function parseRevolutCsv(csvText: string, ignoreSavingsTransfers = true):
 
     const rawDesc = row["Description"] || row["Descripción"] || row["Concepto"] || ""
     const rawAmount = row["Amount"] || row["Importe"] || "0"
-    const rawDate = row["Completed Date"] || row["Started Date"] || row["Fecha de finalización"] || row["Fecha de inicio"] || row["Date"] || row["Fecha"] || ""
+    const rawDate = row["Started Date"] || row["Fecha de inicio"] || row["Completed Date"] || row["Fecha de finalización"] || row["Date"] || row["Fecha"] || ""
 
     // Filtrar traspasos internos a/desde la cuenta de ahorro de Revolut e intereses diarios
     // Ejemplos: "A EUR Ahorros", "Desde EUR Ahorros", "To EUR Savings", "Interés neto pagado a Ahorros", "Vault", etc.
