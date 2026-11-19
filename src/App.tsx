@@ -1,16 +1,18 @@
 import { useState, useMemo } from "react"
 import { useAuth } from "./hooks/useAuth"
 import { useTransactions } from "./hooks/useTransactions"
+import { useFinance } from "./hooks/useFinance"
 import { Sidebar } from "./components/layout/Sidebar"
 import { Topbar } from "./components/layout/Topbar"
 import { DashboardOverview } from "./components/dashboard/DashboardOverview"
 import Transactions from "./pages/Transactions"
 import Analytics from "./pages/Analytics"
+import Finance from "./pages/Finance"
 import AuthPage from "./pages/AuthPage"
 import AddTransactionModal from "./components/transactions/AddTransactionModal"
 import { ImportStatementModal } from "./components/transactions/ImportStatementModal"
 import { getAvailableMonths } from "./utils/dateFilters"
-import { LayoutDashboard, ReceiptText, BarChart3 } from "lucide-react"
+import { LayoutDashboard, ReceiptText, BarChart3, Wallet } from "lucide-react"
 
 const App = () => {
   const { user, photoUrl, updateAvatar, loading: authLoading, signIn, signUp, signOut } = useAuth()
@@ -24,6 +26,7 @@ const App = () => {
     deleteAllTransactions,
     totals,
   } = useTransactions(user?.uid)
+  const finance = useFinance(user?.uid)
 
   const [activeTab, setActiveTab] = useState("overview")
   const [showModal, setShowModal] = useState(false)
@@ -84,6 +87,7 @@ const App = () => {
             { id: "overview", label: "Dashboard", icon: LayoutDashboard },
             { id: "transactions", label: "Transacciones", icon: ReceiptText },
             { id: "analytics", label: "Analítica", icon: BarChart3 },
+            { id: "finance", label: "Finanzas", icon: Wallet },
           ].map((tab) => {
             const Icon = tab.icon
             const isActive = activeTab === tab.id
@@ -133,6 +137,14 @@ const App = () => {
               totals={totals}
             />
           )}
+
+          {activeTab === "finance" && (
+            <Finance
+              transactions={transactions}
+              finance={finance}
+              onImport={() => setShowImportModal(true)}
+            />
+          )}
         </main>
       </div>
 
@@ -150,6 +162,7 @@ const App = () => {
           onImport={addBatchTransactions}
           onUpdateBatch={updateBatchTransactions}
           existingTransactions={transactions}
+          finance={finance}
         />
       )}
     </div>

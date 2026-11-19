@@ -1,14 +1,18 @@
 import { useState, useRef, ChangeEvent } from "react"
 import { FileSpreadsheet, FileText, Loader2, Upload, Check, AlertCircle, Sparkles, ArrowRight, RefreshCw } from "lucide-react"
 import { auth } from "../../lib/firebase"
-import { parseRevolutCsv } from "../../utils/statementParser"
-import type { Transaction, NewTransaction } from "../../types"
+import { parseRevolutStatement, type RevolutStatement } from "../../utils/statementParser"
+import { filterNew, isOwnTransfer, ownTransferKind } from "../../utils/finance"
+import type { FinanceApi } from "../../hooks/useFinance"
+import type { Transaction, NewTransaction, NewTransfer } from "../../types"
 
 interface ImportStatementModalProps {
   onClose: () => void
   onImport: (txs: NewTransaction[]) => Promise<number>
   onUpdateBatch?: (updates: Array<{ id: string; description: string; category: string }>) => Promise<number>
   existingTransactions?: Transaction[]
+  // Finanzas: traspasos, saldos de las cuentas y nombres de tus otras cuentas
+  finance?: Pick<FinanceApi, "transfers" | "settings" | "addTransfers" | "upsertRevolutBalance" | "moveTransactionsToTransfers">
 }
 
 type Step = "upload_statement" | "ask_ventajon" | "upload_ventajon" | "pick_month" | "done"
@@ -40,6 +44,7 @@ export const ImportStatementModal = ({
   onImport,
   onUpdateBatch,
   existingTransactions = [],
+  finance,
 }: ImportStatementModalProps) => {
   const [step, setStep] = useState<Step>("upload_statement")
   const [parsing, setParsing] = useState(false)
@@ -48,6 +53,12 @@ export const ImportStatementModal = ({
   const [error, setError] = useState<string | null>(null)
   const [fileName, setFileName] = useState<string>("")
   const [successCount, setSuccessCount] = useState<number | null>(null)
+  // Lo que se guarda en Finanzas al confirmar (solo CSV) y lo que se omite por estar ya importado
+  const [skippedCount, setSkippedCount] = useState(0)
+  const [pendingTransfers, setPendingTransfers] = useState<NewTransfer[]>([])
+  const [pendingBalances, setPendingBalances] = useState<RevolutStatement["balances"]>({})
+  const [toMove, setToMove] = useState<Transaction[]>([])
+  const [transferCount, setTransferCount] = useState(0)
   const [ventajonCount, setVentajonCount] = useState<number>(0)
   const [updatedVentajonCount, setUpdatedVentajonCount] = useState<number | null>(null)
   const [pendingVentajonCount, setPendingVentajonCount] = useState(0)
@@ -73,6 +84,10 @@ export const ImportStatementModal = ({
     setFileName(file.name)
     setPreviewTxs([])
     setSuccessCount(null)
+    setSkippedCount(0)
+    setPendingTransfers([])
+    setPendingBalances({})
+    setToMove([])
 
     try {
       const isPdf = file.name.endsWith(".pdf") || file.type === "application/pdf"
@@ -80,11 +95,20 @@ export const ImportStatementModal = ({
 
       if (isCsv) {
         const text = await file.text()
-        const parsed = parseRevolutCsv(text)
-        if (parsed.length === 0) {
+        const names = finance?.settings.ownTransferNames ?? []
+        const parsed = parseRevolutStatement(text, names)
+        if (parsed.transactions.length === 0 && parsed.transfers.length === 0) {
           throw new Error("No se encontraron transacciones válidas en el archivo CSV")
         }
-        setPreviewTxs(parsed)
+        // Transferencias con tus otras cuentas que se importaron antes como transacciones: pasan a traspasos
+        const moving = existingTransactions.filter((t) => isOwnTransfer(t.description, names))
+        const newTxs = filterNew(parsed.transactions, existingTransactions)
+        const newTransfers = filterNew(parsed.transfers, [...(finance?.transfers ?? []), ...moving])
+        setPreviewTxs(newTxs)
+        setSkippedCount(parsed.transactions.length - newTxs.length)
+        setPendingTransfers(newTransfers)
+        setPendingBalances(parsed.balances)
+        setToMove(moving)
       } else if (isPdf) {
         const reader = new FileReader()
         const base64Promise = new Promise<string>((resolve, reject) => {
@@ -109,7 +133,9 @@ export const ImportStatementModal = ({
         if (!transactions || transactions.length === 0) {
           throw new Error("No se detectaron transacciones en el PDF")
         }
-        setPreviewTxs(transactions)
+        const newTxs = filterNew(transactions as NewTransaction[], existingTransactions)
+        setPreviewTxs(newTxs)
+        setSkippedCount(transactions.length - newTxs.length)
       } else {
         throw new Error("Por favor selecciona un archivo .csv o .pdf de Revolut")
       }
@@ -122,36 +148,59 @@ export const ImportStatementModal = ({
   }
 
   // 2. Confirmación de guardado de extracto principal
+  const hasBalances = Boolean(pendingBalances.current || pendingBalances.savings)
+  const hasWork = previewTxs.length > 0 || pendingTransfers.length > 0 || toMove.length > 0 || hasBalances
+
   const handleConfirmImport = async () => {
-    if (previewTxs.length === 0) return
+    if (!hasWork) return
     setSaving(true)
     setError(null)
 
     try {
-      const count = await onImport(previewTxs)
-      if (count > 0) {
-        setSuccessCount(count)
+      let count = 0
+      if (previewTxs.length > 0) {
+        count = await onImport(previewTxs)
+        if (count === 0) throw new Error("No se pudieron guardar las transacciones")
+      }
 
-        // Contar cuántos cargos son de "Ventajon" en este lote
-        const vCount = previewTxs.filter((t) => isVentajon(t.description)).length
+      // Si algo de Finanzas falla, se puede reimportar el mismo CSV: lo ya guardado se omite
+      let saved = 0
+      if (finance && toMove.length > 0) {
+        const moved = await finance.moveTransactionsToTransfers(toMove.map((tx) => ({ tx, kind: ownTransferKind(Number(tx.amount)) })))
+        if (moved === 0) throw new Error("No se pudieron mover los traspasos entre tus cuentas")
+        saved += moved
+      }
+      if (finance && pendingTransfers.length > 0) {
+        const added = await finance.addTransfers(pendingTransfers)
+        if (added === 0) throw new Error("No se pudieron guardar los movimientos de ahorro")
+        saved += added
+      }
+      if (finance && pendingBalances.current) {
+        await finance.upsertRevolutBalance("revolut_current", pendingBalances.current.balance, pendingBalances.current.date)
+      }
+      if (finance && pendingBalances.savings) {
+        await finance.upsertRevolutBalance("revolut_savings", pendingBalances.savings.balance, pendingBalances.savings.date)
+      }
+      setTransferCount(saved)
+      setSuccessCount(count)
 
-        // Comprobar si el usuario tiene desactivada la ayuda de Ventajón
-        const ventajonDisabled = localStorage.getItem("fluxi_disable_ventajon") === "true"
+      // Contar cuántos cargos son de "Ventajon" en este lote
+      const vCount = previewTxs.filter((t) => isVentajon(t.description)).length
 
-        if (vCount > 0 && !ventajonDisabled) {
-          setVentajonCount(vCount)
-          setTimeout(() => {
-            setStep("ask_ventajon")
-            setSaving(false)
-          }, 800)
-        } else {
-          setStep("done")
-          setTimeout(() => {
-            onClose()
-          }, 1500)
-        }
+      // Comprobar si el usuario tiene desactivada la ayuda de Ventajón
+      const ventajonDisabled = localStorage.getItem("fluxi_disable_ventajon") === "true"
+
+      if (vCount > 0 && !ventajonDisabled) {
+        setVentajonCount(vCount)
+        setTimeout(() => {
+          setStep("ask_ventajon")
+          setSaving(false)
+        }, 800)
       } else {
-        throw new Error("No se pudieron guardar las transacciones")
+        setStep("done")
+        setTimeout(() => {
+          onClose()
+        }, 1500)
       }
     } catch (err: any) {
       setError(err.message || "Error al importar")
@@ -470,7 +519,7 @@ export const ImportStatementModal = ({
             </div>
 
             {/* Acceso directo: desglosar pagos ya importados sin subir otro extracto */}
-            {previewTxs.length === 0 && !parsing && existingVentajonCount > 0 && (
+            {!hasWork && skippedCount === 0 && !parsing && existingVentajonCount > 0 && (
               <button
                 type="button"
                 onClick={() => setStep("upload_ventajon")}
@@ -491,17 +540,36 @@ export const ImportStatementModal = ({
               </div>
             )}
 
-            {previewTxs.length > 0 && (
+            {!parsing && (hasWork || skippedCount > 0) && (
               <div className="flex-1 overflow-hidden flex flex-col mb-4">
-                <div className="flex justify-between items-center mb-2 px-1">
-                  <span className="text-xs text-white/60">
-                    {previewTxs.length} transacciones listas para importar
-                  </span>
-                  <span className="text-[11px] text-cyan-400 font-medium">
-                    (Traspasos internos a ahorros excluidos)
-                  </span>
-                </div>
+                <ul className="mb-2 px-1 space-y-1 text-xs text-white/60">
+                  <li>
+                    <span className="font-semibold text-white">{previewTxs.length}</span> transacciones nuevas
+                  </li>
+                  {skippedCount > 0 && (
+                    <li className="text-white/40">{skippedCount} ya estaban importadas (se omiten)</li>
+                  )}
+                  {pendingTransfers.length > 0 && (
+                    <li className="text-cyan-300/80">
+                      {pendingTransfers.length} movimientos de ahorro, intereses y traspasos van a Finanzas
+                    </li>
+                  )}
+                  {toMove.length > 0 && (
+                    <li className="text-cyan-300/80">
+                      {toMove.length} transferencias entre tus cuentas salen de Transacciones
+                    </li>
+                  )}
+                  {hasBalances && (
+                    <li className="text-white/40">
+                      Saldo:{" "}
+                      {pendingBalances.current && <>Conjunta {pendingBalances.current.balance.toFixed(2)} €</>}
+                      {pendingBalances.current && pendingBalances.savings && " · "}
+                      {pendingBalances.savings && <>Ahorros {pendingBalances.savings.balance.toFixed(2)} €</>}
+                    </li>
+                  )}
+                </ul>
 
+                {previewTxs.length > 0 && (
                 <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 border border-white/5 rounded-xl p-2 bg-white/[0.01]">
                   {previewTxs.slice(0, 10).map((t, idx) => (
                     <div key={idx} className="flex justify-between items-center text-xs py-1 px-2 rounded-lg bg-white/[0.02]">
@@ -520,6 +588,7 @@ export const ImportStatementModal = ({
                     </div>
                   )}
                 </div>
+                )}
               </div>
             )}
 
@@ -535,7 +604,7 @@ export const ImportStatementModal = ({
               <button
                 type="button"
                 onClick={handleConfirmImport}
-                disabled={previewTxs.length === 0 || saving}
+                disabled={!hasWork || saving}
                 className="liquid-button px-5 py-2 rounded-xl text-xs font-bold text-slate-950 flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {saving ? (
@@ -546,7 +615,7 @@ export const ImportStatementModal = ({
                 ) : (
                   <>
                     <Check className="w-3.5 h-3.5" />
-                    <span>Importar {previewTxs.length} transacciones</span>
+                    <span>{previewTxs.length > 0 ? `Importar ${previewTxs.length} transacciones` : "Guardar en Finanzas"}</span>
                   </>
                 )}
               </button>
@@ -717,9 +786,14 @@ export const ImportStatementModal = ({
             </div>
             <div>
               <p className="text-sm font-bold text-white">¡Proceso completado!</p>
-              {successCount !== null && (
+              {successCount !== null && successCount > 0 && (
                 <p className="text-xs text-white/60 mt-0.5">
                   Se importaron {successCount} transacciones correctamente.
+                </p>
+              )}
+              {transferCount > 0 && (
+                <p className="text-xs text-white/60 mt-0.5">
+                  Se guardaron {transferCount} movimientos de ahorro y traspasos en Finanzas.
                 </p>
               )}
               {updatedVentajonCount !== null && (

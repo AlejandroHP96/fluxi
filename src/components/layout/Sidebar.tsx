@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   ReceiptText,
   BarChart3,
+  Wallet,
   Plus,
   Upload,
   LogOut,
@@ -118,6 +119,20 @@ export const Sidebar = ({
               <div className="flex items-center gap-2.5">
                 <BarChart3 className={`w-4 h-4 ${activeTab === "analytics" ? "text-cyan-400" : "text-white/40"}`} />
                 <span>Analítica</span>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setActiveTab("finance")}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all ${
+                activeTab === "finance"
+                  ? "bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm font-semibold"
+                  : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <Wallet className={`w-4 h-4 ${activeTab === "finance" ? "text-cyan-400" : "text-white/40"}`} />
+                <span>Finanzas</span>
               </div>
             </button>
           </div>
