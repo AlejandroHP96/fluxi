@@ -147,3 +147,88 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .fade-up {
   animation: fadeUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+/* ── Loader ZK (src/components/brand/ZkLoader.tsx, portado de Mi-tcg) ── */
+
+/* El logo real de la app se oculta mientras el loader está ensamblando o volando */
+html.zk-loading #navbar-brand-logo {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.zk-blade {
+  fill: currentColor;
+  opacity: 0;
+  transform-origin: 540px 540px;
+  stroke: #22d3ee;
+  stroke-width: 5;
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+}
+
+.zk-animating .zk-blade {
+  animation: zkAssembleBlade 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes zkAssembleBlade {
+  0% {
+    opacity: 0;
+    transform: scale(0.3) rotate(var(--rot, 0deg));
+    stroke-dashoffset: 600;
+    fill-opacity: 0;
+  }
+  60% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+    fill-opacity: 0.25;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    stroke-dashoffset: 0;
+    stroke-width: 0;
+    fill-opacity: 1;
+  }
+}
+
+.zk-letter {
+  fill: currentColor;
+  opacity: 0;
+  transform-origin: 540px 540px;
+  stroke: #06b6d4;
+  stroke-width: 6;
+  stroke-dasharray: 800;
+  stroke-dashoffset: 800;
+}
+
+.zk-animating .zk-letter {
+  animation: zkDrawLetter 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes zkDrawLetter {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+    stroke-dashoffset: 800;
+    fill-opacity: 0;
+  }
+  70% {
+    opacity: 1;
+    stroke-dashoffset: 0;
+    fill-opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    stroke-dashoffset: 0;
+    stroke-width: 0;
+    fill-opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zk-animating .zk-blade,
+  .zk-animating .zk-letter {
+    animation-duration: 0.01s;
+  }
+}

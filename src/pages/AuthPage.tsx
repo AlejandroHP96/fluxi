@@ -2,6 +2,7 @@ import { useState } from "react"
 import type { FirebaseError } from "firebase/app"
 import type { AuthResult } from "../types"
 import { DEMO_EMAIL, DEMO_PASSWORD } from "../constants/demo"
+import { ZkLogo } from "../components/brand/ZkLogo"
 
 const FIREBASE_ERRORS: Record<string, string> = {
   "auth/email-already-in-use":  "Este email ya está registrado.",
@@ -60,7 +61,7 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 justify-center mb-10">
-          <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-black font-bold text-lg">F</div>
+          <ZkLogo id="navbar-brand-logo" className="w-10 h-10" />
           <span className="font-bold text-2xl tracking-tight">Fluxi</span>
         </div>
         <div className="bg-card border border-border rounded-2xl p-7">

@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { UserAvatar } from "../ui/UserAvatar"
+import { ZkLogo } from "../brand/ZkLogo"
 
 interface SidebarProps {
   activeTab: string
@@ -39,9 +40,7 @@ export const Sidebar = ({
     <aside className="w-64 shrink-0 h-screen sticky top-0 hidden lg:flex flex-col border-r border-white/[0.08] bg-[#080d16]/80 backdrop-blur-2xl p-5 select-none z-30">
       {/* 1. Header del Workspace */}
       <div className="flex items-center gap-3 px-2 py-2 mb-6">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-sky-400 flex items-center justify-center text-slate-950 font-black text-base shadow-lg shadow-cyan-500/20 shrink-0">
-          F
-        </div>
+        <ZkLogo id="navbar-brand-logo" className="w-9 h-9 shrink-0" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span className="font-bold text-sm text-white tracking-tight">Fluxi Finance</span>
