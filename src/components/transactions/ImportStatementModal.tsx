@@ -1,5 +1,6 @@
 import { useState, useRef, ChangeEvent } from "react"
-import { FileSpreadsheet, FileText, Loader2, Upload, Check, AlertCircle, Sparkles, ArrowRight } from "lucide-react"
+import { FileSpreadsheet, FileText, Loader2, Upload, Check, AlertCircle, Sparkles, ArrowRight, RefreshCw } from "lucide-react"
+import { auth } from "../../lib/firebase"
 import { parseRevolutCsv } from "../../utils/statementParser"
 import type { Transaction, NewTransaction } from "../../types"
 
@@ -52,6 +53,7 @@ export const ImportStatementModal = ({
   const [pendingVentajonCount, setPendingVentajonCount] = useState(0)
   const [pendingItems, setPendingItems] = useState<any[] | null>(null)
   const [pickedMonth, setPickedMonth] = useState("") // "YYYY-MM"
+  const [ventajonSource, setVentajonSource] = useState<"pdf" | "sync">("pdf")
 
   const existingVentajonCount = existingTransactions.filter((t) => isVentajon(t.description)).length
 
@@ -194,7 +196,8 @@ export const ImportStatementModal = ({
         setStep("pick_month")
         return
       }
-      await matchAndSave(items, period)
+      setVentajonSource("pdf")
+      await matchAndSave(withYear(items, period))
     } catch (err: any) {
       setError(err?.message || "Error al leer el extracto de Ventajón")
     } finally {
@@ -209,7 +212,8 @@ export const ImportStatementModal = ({
     setParsing(true)
     setError(null)
     try {
-      await matchAndSave(pendingItems, { year: +m[1], month: +m[2] })
+      setVentajonSource("pdf")
+      await matchAndSave(withYear(pendingItems, { year: +m[1], month: +m[2] }))
       setPendingItems(null)
     } catch (err: any) {
       setError(err?.message || "Error al emparejar el extracto de Ventajón")
@@ -218,14 +222,61 @@ export const ImportStatementModal = ({
     }
   }
 
-  // Empareja las compras del PDF con los pagos "Ventajon" guardados y guarda el comercio real
-  const matchAndSave = async (rawItems: any[], period: { year: number; month: number }) => {
-    // El extracto de un mes trae compras de ese mes y del anterior: un mes posterior al del
-    // extracto solo puede ser del año anterior (p. ej. diciembre en el extracto de enero).
-    const items = rawItems.map((it) => {
+  // Sincroniza con la web de Ventajón (api/ventajon-sync): pide los meses de los pagos sin desglosar
+  const handleVentajonSync = async () => {
+    setParsing(true)
+    setError(null)
+    try {
+      const months = new Set<string>()
+      for (const t of existingTransactions) {
+        if (!isVentajon(t.description)) continue
+        const day = parseTxDay(t.date)
+        if (!day) continue
+        // También los meses vecinos, por si la compra cae a final o principio de mes
+        for (const offset of [-MAX_DAY_DIFF, 0, MAX_DAY_DIFF]) {
+          months.add(new Date(day.getTime() + offset * DAY_MS).toISOString().slice(0, 7))
+        }
+      }
+      if (months.size === 0) throw new Error("No hay pagos de Ventajon pendientes de desglosar")
+
+      const idToken = await auth.currentUser?.getIdToken()
+      if (!idToken) throw new Error("Inicia sesión para sincronizar con Ventajón")
+
+      const res = await fetch("/api/ventajon-sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ months: [...months].sort() }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Fallo al sincronizar con Ventajón")
+      }
+
+      const { items } = await res.json()
+      // "2026-10-31T13:30:44.149" -> mismo formato que el PDF ("31.10") más el año
+      const mapped = (items as Array<{ date: string }>).map((it) => {
+        const [y, m, d] = it.date.slice(0, 10).split("-")
+        return { ...it, dateShort: `${d}.${m}`, year: +y }
+      })
+      setVentajonSource("sync")
+      await matchAndSave(mapped)
+    } catch (err: any) {
+      setError(err?.message || "Error al sincronizar con Ventajón")
+    } finally {
+      setParsing(false)
+    }
+  }
+
+  // El extracto de un mes trae compras de ese mes y del anterior: un mes posterior al del
+  // extracto solo puede ser del año anterior (p. ej. diciembre en el extracto de enero).
+  const withYear = (rawItems: any[], period: { year: number; month: number }) =>
+    rawItems.map((it) => {
       const month = Number(String(it.dateShort).split(".")[1])
       return { ...it, year: month <= period.month ? period.year : period.year - 1 }
     })
+
+  // Empareja las compras de Ventajón (PDF o API) con los pagos "Ventajon" guardados y guarda el comercio real
+  const matchAndSave = async (items: any[]) => {
 
     // existingTransactions llega por props desde el onSnapshot de App.tsx, que ya incluye
     // los movimientos recién importados (Firestore emite primero las escrituras locales).
@@ -466,10 +517,9 @@ export const ImportStatementModal = ({
                 Se han detectado {ventajonCount} pagos de &quot;Ventajon&quot;
               </p>
               <p className="text-white/70 leading-relaxed">
-                ¿Tienes a mano el extracto digital en PDF de Ventajón? Podemos reemplazar
-                &quot;Ventajon&quot; por el comercio real (Mercadona, McDonald&apos;s, IKEA...) y
-                categorizarlos al instante. Ojo: el extracto de cada mes recoge las compras del mes
-                anterior (el de diciembre trae las de noviembre).
+                Podemos reemplazar &quot;Ventajon&quot; por el comercio real (Mercadona,
+                McDonald&apos;s, IKEA...) y categorizarlos al instante, sincronizando con tu cuenta
+                de Ventajón o subiendo el extracto en PDF.
               </p>
             </div>
 
@@ -480,7 +530,7 @@ export const ImportStatementModal = ({
                 className="liquid-button w-full py-3 px-4 rounded-xl text-xs font-bold text-slate-950 flex items-center justify-center gap-2"
               >
                 <Sparkles className="w-4 h-4" />
-                <span>Sí, subir PDF de Ventajón ahora</span>
+                <span>Sí, desglosar ahora</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
 
@@ -506,6 +556,17 @@ export const ImportStatementModal = ({
         {/* PASO 3: Subir PDF de Ventajón */}
         {step === "upload_ventajon" && (
           <div className="space-y-4 py-2">
+            <button
+              type="button"
+              onClick={handleVentajonSync}
+              disabled={parsing}
+              className="liquid-button w-full py-3 px-4 rounded-xl text-xs font-bold text-slate-950 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {parsing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              <span>{parsing ? "Sincronizando con Ventajón..." : "Sincronizar con Ventajón"}</span>
+            </button>
+            <p className="text-center text-[11px] text-white/40">o sube el extracto en PDF</p>
+
             <input
               ref={ventajonFileInputRef}
               type="file"
@@ -623,8 +684,9 @@ export const ImportStatementModal = ({
               )}
               {pendingVentajonCount > 0 && (
                 <p className="text-[11px] text-white/50 mt-1 max-w-xs">
-                  {pendingVentajonCount} pagos de Ventajon siguen sin comercio: no aparecen en ese PDF.
-                  Sube el extracto del mes siguiente cuando lo tengas.
+                  {ventajonSource === "sync"
+                    ? `${pendingVentajonCount} pagos de Ventajon siguen sin comercio: no hay una compra en Ventajón con el mismo importe y fecha.`
+                    : `${pendingVentajonCount} pagos de Ventajon siguen sin comercio: no aparecen en ese PDF. Sube el extracto del mes siguiente cuando lo tengas.`}
                 </p>
               )}
               {pendingVentajonCount > 0 && (
