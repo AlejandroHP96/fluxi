@@ -5,8 +5,9 @@ import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey
 import type { Expense } from "../types/budget"
 import { AppHeader } from "../components/budget/AppHeader"
 import { MonthNav } from "../components/budget/MonthNav"
-import { IncomeCard } from "../components/budget/IncomeCard"
-import { Envelopes } from "../components/budget/Envelopes"
+import { BentoKpis } from "../components/budget/BentoKpis"
+import { MonthCharts } from "../components/budget/MonthCharts"
+import { EnvelopesGrid } from "../components/budget/EnvelopesGrid"
 import { ExpenseList } from "../components/budget/ExpenseList"
 import { ExpenseModal } from "../components/budget/ExpenseModal"
 import { ImportWizard } from "../components/budget/ImportWizard"
@@ -100,7 +101,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
     <div className="min-h-screen bg-[#07090e] text-white">
       {header}
 
-      <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-12 sm:pt-7">
+      <main className="fade-up mx-auto max-w-6xl space-y-6 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-12 sm:pt-6">
         <MonthNav
           month={month}
           isCurrent={summary.isCurrent}
@@ -112,24 +113,35 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
 
         {errorBanner}
 
-        <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-[auto_1fr] lg:items-start">
-          <div className="lg:col-start-1 lg:row-start-1">
-            {loading ? (
-              <div className="h-80 animate-pulse rounded-3xl bg-white/[0.04]" aria-busy="true" />
-            ) : (
-              <IncomeCard
-                key={month}
-                summary={summary}
-                suggestedIncome={lastIncomeBefore(income, month)}
-                onSetIncome={setIncome}
-                onEditFixed={() => openSettings("fixed")}
-              />
-            )}
+        {/* Fila 1: KPIs Bento */}
+        <BentoKpis
+          summary={summary}
+          suggestedIncome={lastIncomeBefore(income, month)}
+          onSetIncome={setIncome}
+          onEditFixed={() => openSettings("fixed")}
+          onEditCategories={() => openSettings("categories")}
+        />
+
+        {/* Fila 2: Gráficas de cada mes (Evolución diaria, Historial 6 meses, Reparto) */}
+        <MonthCharts
+          currentMonth={month}
+          allExpenses={expenses}
+          allIncome={income}
+          categories={categories}
+          fixedExpenses={fixedExpenses}
+          summary={summary}
+        />
+
+        {/* Fila 3: Sobres del mes (Grid) y Lista de gastos interactiva */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-7 space-y-6">
+            <EnvelopesGrid
+              summary={summary}
+              categories={categories}
+              onEdit={() => openSettings("categories")}
+            />
           </div>
-          <div className="lg:col-start-1 lg:row-start-2">
-            {!loading && <Envelopes summary={summary} categories={categories} onEdit={() => openSettings("categories")} />}
-          </div>
-          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <div className="lg:col-span-5 lg:sticky lg:top-20">
             <ExpenseList
               expenses={monthExpenses}
               categories={categories}

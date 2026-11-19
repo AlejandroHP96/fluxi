@@ -1,5 +1,5 @@
-import { useMemo } from "react"
-import { Plus } from "lucide-react"
+import { useMemo, useState } from "react"
+import { Plus, Search, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { resolveCategory, todayKey } from "../../utils/month"
 import type { BudgetCategory, Expense } from "../../types/budget"
@@ -14,16 +14,106 @@ interface ExpenseListProps {
 }
 
 export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: ExpenseListProps) => {
+  const [search, setSearch] = useState("")
+  const [selectedCat, setSelectedCat] = useState<string | null>(null)
+
+  const filtered = useMemo(() => {
+    let list = expenses
+    if (selectedCat) {
+      list = list.filter((e) => {
+        const cat = resolveCategory(e.category, categories)
+        return cat ? cat.id === selectedCat : selectedCat === "uncat"
+      })
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter((e) => {
+        const cat = resolveCategory(e.category, categories)
+        const catName = cat?.name.toLowerCase() ?? "sin categoría"
+        return e.concept.toLowerCase().includes(q) || catName.includes(q)
+      })
+    }
+    return list
+  }, [expenses, categories, search, selectedCat])
+
   const groups = useMemo(() => {
     const map = new Map<string, Expense[]>()
-    for (const e of expenses) map.set(e.date, [...(map.get(e.date) ?? []), e])
-    return [...map.entries()].map(([date, items]) => ({ date, items, total: items.reduce((a, e) => a + e.amount, 0) }))
-  }, [expenses])
+    for (const e of filtered) map.set(e.date, [...(map.get(e.date) ?? []), e])
+    return [...map.entries()].map(([date, items]) => ({
+      date,
+      items,
+      total: items.reduce((a, e) => a + e.amount, 0),
+    }))
+  }, [filtered])
+
+  const totalFilteredAmount = useMemo(() => filtered.reduce((a, e) => a + e.amount, 0), [filtered])
   const today = todayKey()
 
   return (
-    <section>
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-white/60">Gastos del mes</h2>
+    <section className="space-y-3.5">
+      {/* Encabezado y botón rápido */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-white/60">Gastos del mes</h2>
+          <span className="rounded-full bg-white/[0.08] px-2 py-0.5 text-xs tabular-nums text-white/60">
+            {expenses.length}
+          </span>
+        </div>
+
+        <button
+          onClick={onAdd}
+          className="liquid-button flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-[#04202a]"
+        >
+          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+          <span>Apuntar gasto</span>
+        </button>
+      </div>
+
+      {/* Buscador y filtro si hay gastos */}
+      {expenses.length > 0 && (
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por comercio o concepto…"
+              className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-sm"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-full p-1 text-white/50 hover:text-white"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          {/* Filtros rápidos de categoría si hay búsqueda activa o muchos gastos */}
+          {(search.trim() || selectedCat) && (
+            <div className="flex items-center justify-between text-xs text-white/55 px-1">
+              <span>
+                {filtered.length} {filtered.length === 1 ? "resultado" : "resultados"}:{" "}
+                <span className="font-semibold text-white/80 tabular-nums">{fmt(totalFilteredAmount)}</span>
+              </span>
+              {(search || selectedCat) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch("")
+                    setSelectedCat(null)
+                  }}
+                  className="text-cyan-300 hover:underline"
+                >
+                  Limpiar filtros
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {loading ? (
         <div className="space-y-2.5" aria-busy="true">
@@ -31,7 +121,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
             <div key={i} className="h-14 animate-pulse rounded-2xl bg-white/[0.04]" />
           ))}
         </div>
-      ) : groups.length === 0 ? (
+      ) : expenses.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-white/12 px-6 py-12 text-center">
           <p className="text-base font-medium text-white/80">Todavía no hay gastos este mes</p>
           <p className="mt-1 text-sm text-white/60">Apunta el primero y verás cómo avanza tu presupuesto.</p>
@@ -43,31 +133,42 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
             Apuntar gasto
           </button>
         </div>
+      ) : groups.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-white/50">
+          No hay gastos que coincidan con la búsqueda «{search}».
+        </div>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-4">
           {groups.map((g) => (
             <div key={g.date}>
               <div className="mb-1.5 flex items-baseline justify-between px-1">
-                <span className="text-sm font-semibold text-white/80 first-letter:uppercase">{dayLabel(g.date, today)}</span>
-                <span className="text-xs tabular-nums text-white/60">{fmt(g.total)}</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-white/60 first-letter:uppercase">
+                  {dayLabel(g.date, today)}
+                </span>
+                <span className="text-xs font-medium tabular-nums text-white/50">{fmt(g.total)}</span>
               </div>
               <ul className="divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.025]">
                 {g.items.map((e) => {
                   const cat = resolveCategory(e.category, categories)
                   return (
-                  <li key={e.id}>
-                    <button
-                      onClick={() => onSelect(e)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.05] active:bg-white/[0.08]"
-                    >
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: catColor(categories, cat) }} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[15px] font-medium">{e.concept}</span>
-                        <span className="block text-xs text-white/60">{cat?.name ?? "Sin categoría"}</span>
-                      </span>
-                      <span className="shrink-0 text-[15px] font-semibold tabular-nums">{fmt(e.amount)}</span>
-                    </button>
-                  </li>
+                    <li key={e.id}>
+                      <button
+                        onClick={() => onSelect(e)}
+                        className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.05] active:bg-white/[0.08]"
+                      >
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: catColor(categories, cat) }}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-white/95">{e.concept}</span>
+                          <span className="block text-xs text-white/50">{cat?.name ?? "Sin categoría"}</span>
+                        </span>
+                        <span className="shrink-0 text-sm font-semibold tabular-nums text-white/90">
+                          {fmt(e.amount)}
+                        </span>
+                      </button>
+                    </li>
                   )
                 })}
               </ul>
