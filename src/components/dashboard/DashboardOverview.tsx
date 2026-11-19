@@ -1,4 +1,4 @@
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell,
@@ -6,6 +6,7 @@ import {
 import { Wallet, TrendingUp, TrendingDown, PiggyBank, ArrowUpRight } from "lucide-react"
 import KpiCard from "../ui/KpiCard"
 import CustomTooltip from "../ui/CustomTooltip"
+import TransactionDetailModal from "../transactions/TransactionDetailModal"
 import { fmt, fmtDec, buildMonthlyData, buildCategoryData } from "../../utils/formatters"
 import { MONTHS } from "../../constants/categories"
 import { filterTransactionsByMonth, computeTotals } from "../../utils/dateFilters"
@@ -58,6 +59,8 @@ export const DashboardOverview = ({
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 8)
   }, [currentMonthTxs])
+
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
 
   const kpis = [
     {
@@ -236,7 +239,7 @@ export const DashboardOverview = ({
             {/* Vista Móvil: Lista limpia tipo Card sin scroll horizontal */}
             <div className="sm:hidden divide-y divide-white/5">
               {recent.map((t) => (
-                <div key={t.id} className="py-3 flex items-center justify-between gap-3">
+                <div key={t.id} onClick={() => setSelectedTx(t)} className="py-3 flex items-center justify-between gap-3 cursor-pointer">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-semibold text-white truncate">{t.description}</p>
                     <div className="text-[10px] text-white/40 flex items-center gap-1.5 mt-0.5">
@@ -273,7 +276,7 @@ export const DashboardOverview = ({
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {recent.map((t) => (
-                    <tr key={t.id} className="hover:bg-white/[0.02] transition-colors">
+                    <tr key={t.id} onClick={() => setSelectedTx(t)} className="hover:bg-white/[0.02] transition-colors cursor-pointer">
                       <td className="px-4 py-3 text-xs whitespace-nowrap">
                         <span className="text-white/80">{t.date.split(" ")[0]}</span>
                         {t.date.includes(" ") && (
@@ -299,6 +302,10 @@ export const DashboardOverview = ({
           </>
         )}
       </div>
+
+      {selectedTx && (
+        <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
+      )}
     </div>
   )
 }

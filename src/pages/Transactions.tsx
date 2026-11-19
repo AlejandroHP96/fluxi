@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import { Trash2, Loader2 } from "lucide-react"
 import TransactionRow from "../components/transactions/TransactionRow"
+import TransactionDetailModal from "../components/transactions/TransactionDetailModal"
 import { MonthSelector } from "../components/ui/MonthSelector"
 import { fmtDec } from "../utils/formatters"
 import { getAvailableMonths, filterTransactionsByMonth } from "../utils/dateFilters"
@@ -20,6 +21,7 @@ interface TransactionsProps {
 
 const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps) => {
   const [deletingAll, setDeletingAll] = useState(false)
+  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const monthOptions = useMemo(() => getAvailableMonths(transactions), [transactions])
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     return monthOptions[0]?.key || "all"
@@ -131,7 +133,7 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
           </p>
         ) : (
           visibleTransactions.map((t) => (
-            <div key={t.id} className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.02]">
+            <div key={t.id} onClick={() => setSelectedTx(t)} className="flex items-center justify-between px-4 py-3.5 hover:bg-white/[0.02] cursor-pointer">
               <div className="flex-1 min-w-0 pr-3">
                 <p className="text-xs font-semibold text-white truncate">{t.description}</p>
                 <p className="text-[10px] text-white/40 mt-0.5">
@@ -152,7 +154,7 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
                   {fmtDec(t.amount)}
                 </span>
                 <button
-                  onClick={() => onDelete(t.id)}
+                  onClick={(e) => { e.stopPropagation(); onDelete(t.id) }}
                   className="w-6 h-6 rounded-lg text-white/30 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-colors text-base"
                 >
                   ×
@@ -193,6 +195,7 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
                   key={t.id}
                   tx={t}
                   onDelete={onDelete}
+                  onSelect={setSelectedTx}
                   isEven={i % 2 === 0}
                 />
               ))
@@ -200,6 +203,10 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
           </tbody>
         </table>
       </div>
+
+      {selectedTx && (
+        <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
+      )}
 
       {/* Elemento disparador de scroll infinito */}
       {hasMore && (

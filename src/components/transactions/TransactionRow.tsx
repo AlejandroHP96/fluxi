@@ -4,11 +4,12 @@ import type { Transaction } from "../../types"
 interface TransactionRowProps {
   tx: Transaction
   onDelete: (id: string) => Promise<boolean>
+  onSelect?: (tx: Transaction) => void
   isEven: boolean
 }
 
-const TransactionRow = ({ tx, onDelete }: TransactionRowProps) => (
-  <tr className="hover:bg-white/[0.03] transition-colors group">
+const TransactionRow = ({ tx, onDelete, onSelect }: TransactionRowProps) => (
+  <tr onClick={() => onSelect?.(tx)} className="hover:bg-white/[0.03] transition-colors group cursor-pointer">
     <td className="px-5 py-3.5 text-xs whitespace-nowrap">
       <span className="text-white/80">{tx.date.split(" ")[0]}</span>
       {tx.date.includes(" ") && (
@@ -28,7 +29,7 @@ const TransactionRow = ({ tx, onDelete }: TransactionRowProps) => (
     </td>
     <td className="px-5 py-3.5 text-right w-10">
       <button
-        onClick={() => onDelete(tx.id)}
+        onClick={(e) => { e.stopPropagation(); onDelete(tx.id) }}
         className="w-6 h-6 rounded-lg text-white/20 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center transition-all opacity-0 group-hover:opacity-100"
       >
         ×
