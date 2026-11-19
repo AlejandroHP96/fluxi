@@ -105,6 +105,7 @@ async function ventajonGet(session: Session, path: string): Promise<any> {
 
 // Compras cobradas en la tarjeta vinculada (las que en Revolut salen como "Ventajon").
 // Se descartan las pagadas con saldo de Ventajón (fundingSource ACCOUNT) y los ingresos de ahorro.
+// Hasta abril de 2026 Ventajón no rellenaba fundingSource (null): esas también son de la tarjeta.
 export async function fetchVentajonPurchases(session: Session, months: string[]): Promise<VentajonPurchase[]> {
   const cards: Array<{ panMd5: string }> = (await ventajonGet(session, "cards")) || []
   const out: VentajonPurchase[] = []
@@ -124,7 +125,7 @@ export async function fetchVentajonPurchases(session: Session, months: string[])
         })
       )
       for (const tx of batches.flat()) {
-        if (tx.type !== "COMPRA" || tx.fundingSource !== "DECOUPLED_CARD") continue
+        if (tx.type !== "COMPRA" || tx.fundingSource === "ACCOUNT") continue
         const concept = cleanVentajonConcept(String(tx.description || ""))
         out.push({
           date: String(tx.date),
