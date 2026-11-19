@@ -1,4 +1,4 @@
-import type { BudgetCategory, EnvelopeSummary, Expense, MonthStatus, MonthSummary } from "../types/budget"
+import type { BudgetCategory, EnvelopeSummary, Expense, FixedExpense, MonthStatus, MonthSummary } from "../types/budget"
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
@@ -47,6 +47,7 @@ export function summarizeMonth(
   month: string,
   income: number | null,
   categories: BudgetCategory[],
+  fixedExpenses: FixedExpense[] = [],
   today = new Date()
 ): MonthSummary {
   const inMonth = expenses.filter((e) => e.date.startsWith(month))
@@ -65,7 +66,11 @@ export function summarizeMonth(
     else uncategorized += Number(e.amount)
   }
 
-  const base = income ?? 0
+  const rawIncome = income ?? 0
+  const totalFixed = fixedExpenses.reduce((a, f) => a + (Number(f.amount) || 0), 0)
+  const netIncome = Math.max(0, rawIncome - totalFixed)
+  const base = income !== null ? netIncome : 0
+
   const envelope = (c: BudgetCategory): EnvelopeSummary => {
     const allocated = (base * c.pct) / 100
     const spent = spentBy.get(c.id) || 0
@@ -80,19 +85,20 @@ export function summarizeMonth(
   const envelopes = categories.filter((c) => !c.savings).map(envelope)
   const saved = savings.reduce((a, s) => a + s.allocated, 0)
   const spent = inMonth.reduce((a, e) => a + Number(e.amount), 0)
-  const spendable = base - saved
+  const spendable = income !== null ? (rawIncome - totalFixed) - saved : 0
   const available = spendable - spent
   const pctSpent = spendable > 0 ? (spent / spendable) * 100 : 0
 
   let status: MonthStatus = "sin-nomina"
   if (income !== null) {
-    if (spent > spendable + 0.005) status = "pasado"
+    if (spent > spendable + 0.005 || rawIncome < totalFixed) status = "pasado"
     else if (isCurrent && pctSpent > pctElapsed) status = "ritmo-alto"
     else status = "bien"
   }
 
   return {
-    month, income, totalPct, unassignedPct, unassigned: (base * unassignedPct) / 100, saved, spendable, spent, available,
+    month, income, fixedExpenses, totalFixed, netIncome, totalPct, unassignedPct,
+    unassigned: (base * unassignedPct) / 100, saved, spendable, spent, available,
     pctSpent, pctElapsed, status, daysInMonth: total, daysLeft,
     dailyAllowance: isCurrent && income !== null && daysLeft > 0 ? Math.max(0, available) / daysLeft : null,
     isCurrent, isPast, envelopes, savings, uncategorized, count: inMonth.length,

@@ -5,7 +5,7 @@ import {
 import { db } from "../lib/firebase"
 import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
-import type { BudgetCategory, Expense, NewExpense } from "../types/budget"
+import type { BudgetCategory, Expense, FixedExpense, NewExpense } from "../types/budget"
 import type { CategoryMemory } from "../utils/importQueue"
 
 // Gastos (colección "expenses") y ajustes del usuario en budgets/{uid}: categorías con %, nómina de cada
@@ -13,6 +13,7 @@ import type { CategoryMemory } from "../utils/importQueue"
 export const useBudget = (userId: string | undefined) => {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [categories, setCategories] = useState<BudgetCategory[]>([])
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
   const [income, setIncomeMap] = useState<Record<string, number>>({})
   const [memory, setMemory] = useState<CategoryMemory>({})
   const [loading, setLoading] = useState(true)
@@ -68,6 +69,7 @@ export const useBudget = (userId: string | undefined) => {
     const unsubSettings = onSnapshot(doc(db, "budgets", userId), (s) => {
       const data = s.data()
       setCategories((data?.categories as BudgetCategory[] | undefined) ?? [])
+      setFixedExpenses((data?.fixedExpenses as FixedExpense[] | undefined) ?? [])
       setIncomeMap((data?.income as Record<string, number> | undefined) ?? {})
       setMemory((data?.memory as CategoryMemory | undefined) ?? {})
       markLoaded("settings")
@@ -133,15 +135,22 @@ export const useBudget = (userId: string | undefined) => {
       categories: list.map((c) => ({ id: c.id || newCategoryId(), name: c.name.trim(), pct: Number(c.pct) || 0, savings: Boolean(c.savings) })),
     }, { merge: true }))
 
+  // Guarda la lista completa de gastos fijos mensuales (nombre e importe en €)
+  const saveFixedExpenses = (list: FixedExpense[]) =>
+    run(() => setDoc(settingsRef(), {
+      userId,
+      fixedExpenses: list.map((f) => ({ id: f.id || newCategoryId(), name: f.name.trim(), amount: Math.abs(Number(f.amount)) || 0 })),
+    }, { merge: true }))
+
   // Recuerda la categoría (id) o SKIP elegida para un concepto al importar. merge: true fusiona el mapa,
   // así varias elecciones seguidas no se pisan aunque el estado local aún no se haya actualizado
   const remember = (key: string, choice: string) =>
     run(() => setDoc(settingsRef(), { userId, memory: { [key]: choice } }, { merge: true }))
 
   return {
-    expenses, categories, income, memory, loading, error,
+    expenses, categories, fixedExpenses, income, memory, loading, error,
     addExpense, updateExpense, deleteExpense, reassignExpenses,
-    setIncome, saveCategories, remember,
+    setIncome, saveCategories, saveFixedExpenses, remember,
   }
 }
 

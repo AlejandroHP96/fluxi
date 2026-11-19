@@ -1,15 +1,21 @@
 import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { X } from "lucide-react"
+import { fmt } from "../../utils/formatters"
 import { resolveCategory } from "../../utils/month"
-import type { BudgetCategory, Expense } from "../../types/budget"
+import type { BudgetCategory, Expense, FixedExpense } from "../../types/budget"
 import { CategoryEditor } from "./CategoryEditor"
 import { fromDraft, toDraft, validateDraft, type DraftCat } from "./categoryDraft"
+import { FixedExpenseEditor } from "./FixedExpenseEditor"
+import { draftFixedTotal, fromFixedDraft, toFixedDraft, validateFixedDraft, type DraftFixed } from "./fixedDraft"
 
 interface CategorySettingsProps {
   categories: BudgetCategory[]
   expenses: Expense[]
+  fixedExpenses?: FixedExpense[]
+  initialTab?: "categories" | "fixed"
   onSave: (list: BudgetCategory[]) => Promise<boolean>
+  onSaveFixedExpenses?: (list: FixedExpense[]) => Promise<boolean>
   onReassign: (ids: string[], categoryId: string) => Promise<boolean>
   onClose: () => void
 }
@@ -20,12 +26,25 @@ interface PendingDelete {
   target: string // id de destino o "" = dejarlos sin categoría
 }
 
-export const CategorySettings = ({ categories, expenses, onSave, onReassign, onClose }: CategorySettingsProps) => {
+export const CategorySettings = ({
+  categories,
+  expenses,
+  fixedExpenses = [],
+  initialTab = "categories",
+  onSave,
+  onSaveFixedExpenses,
+  onReassign,
+  onClose,
+}: CategorySettingsProps) => {
+  const [tab, setTab] = useState<"categories" | "fixed">(initialTab)
   const [draft, setDraft] = useState<DraftCat[]>(() => toDraft(categories))
+  const [fixedDraft, setFixedDraft] = useState<DraftFixed[]>(() => toFixedDraft(fixedExpenses))
   const [pending, setPending] = useState<PendingDelete | null>(null)
   const [moves, setMoves] = useState<Array<{ from: string; to: string }>>([]) // categoría borrada -> destino
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  const fixedTotal = draftFixedTotal(fixedDraft)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
@@ -65,15 +84,29 @@ export const CategorySettings = ({ categories, expenses, onSave, onReassign, onC
   }
 
   const save = async () => {
-    const problem = validateDraft(draft)
-    if (problem) return setError(problem)
+    const catProblem = validateDraft(draft)
+    if (catProblem) {
+      setTab("categories")
+      return setError(catProblem)
+    }
+    const fixedProblem = validateFixedDraft(fixedDraft)
+    if (fixedProblem) {
+      setTab("fixed")
+      return setError(fixedProblem)
+    }
+
     setError(null)
     setBusy(true)
+
     const list = fromDraft(draft)
-    if (!(await onSave(list))) {
+    const okCats = await onSave(list)
+    const okFixed = onSaveFixedExpenses ? await onSaveFixedExpenses(fromFixedDraft(fixedDraft)) : true
+
+    if (!okCats || !okFixed) {
       setBusy(false)
       return setError("No se pudo guardar. Inténtalo de nuevo.")
     }
+
     // Mover los gastos de las categorías borradas, solo a destinos que siguen existiendo
     for (const m of moves) {
       const ids = idsByCategory.get(m.from) ?? []
@@ -91,14 +124,16 @@ export const CategorySettings = ({ categories, expenses, onSave, onReassign, onC
     >
       <div
         role="dialog"
-        aria-label="Categorías y reparto"
+        aria-label="Ajustes de presupuesto"
         className="glass-panel fade-up flex max-h-[94dvh] w-full max-w-lg flex-col rounded-t-3xl sm:rounded-3xl"
       >
         <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-5 sm:px-6 sm:pt-6">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Categorías y reparto</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Presupuesto y reparto</h2>
             <p className="mt-0.5 text-sm text-white/65">
-              Cada categoría se lleva un % de tu nómina. Vale para todos los meses: si lo cambias, se recalculan también los pasados.
+              {tab === "categories"
+                ? "Reparte en sobres con % el dinero que queda tras descontar los gastos fijos."
+                : "Gastos que se repiten todos los meses. Se descuentan de la nómina antes de hacer los %."}
             </p>
           </div>
           <button
@@ -111,8 +146,47 @@ export const CategorySettings = ({ categories, expenses, onSave, onReassign, onC
           </button>
         </div>
 
+        {/* Selector de pestañas */}
+        <div className="px-5 pb-3 sm:px-6">
+          <div className="flex rounded-xl bg-white/[0.06] p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setTab("categories")
+                setError(null)
+              }}
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
+                tab === "categories" ? "bg-white/15 text-white shadow-sm" : "text-white/60 hover:text-white"
+              }`}
+            >
+              Sobres (%)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTab("fixed")
+                setError(null)
+              }}
+              className={`flex-1 rounded-lg py-2 text-sm font-semibold transition-all ${
+                tab === "fixed" ? "bg-white/15 text-white shadow-sm" : "text-white/60 hover:text-white"
+              }`}
+            >
+              Gastos fijos (€) {fixedTotal > 0 && <span className="ml-1 text-xs opacity-75 tabular-nums">· {fmt(fixedTotal)}</span>}
+            </button>
+          </div>
+        </div>
+
         <div className="flex-1 overflow-y-auto px-5 pb-2 sm:px-6">
-          <CategoryEditor draft={draft} onChange={setDraft} onDelete={requestDelete} sticky />
+          {tab === "categories" ? (
+            <CategoryEditor draft={draft} onChange={setDraft} onDelete={requestDelete} sticky />
+          ) : (
+            <FixedExpenseEditor
+              draft={fixedDraft}
+              onChange={setFixedDraft}
+              onDelete={(row) => setFixedDraft((d) => d.filter((x) => x.id !== row.id))}
+              sticky
+            />
+          )}
         </div>
 
         <div className="space-y-3 border-t border-white/[0.08] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-6">
@@ -170,7 +244,7 @@ export const CategorySettings = ({ categories, expenses, onSave, onReassign, onC
               disabled={busy}
               className="liquid-button ml-auto flex-1 rounded-xl px-5 py-3.5 text-base font-semibold text-[#04202a] disabled:opacity-60 sm:flex-none sm:min-w-[10rem]"
             >
-              {busy ? "Guardando…" : "Guardar reparto"}
+              {busy ? "Guardando…" : "Guardar cambios"}
             </button>
           </div>
         </div>

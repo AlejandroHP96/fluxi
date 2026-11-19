@@ -56,7 +56,14 @@ export const Envelopes = ({ summary: s, categories, onEdit }: EnvelopesProps) =>
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">Sobres del mes</h2>
+        <div>
+          <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">Sobres del mes</h2>
+          {hasIncome && s.totalFixed > 0 && (
+            <p className="mt-0.5 text-xs text-white/50">
+              Reparto sobre <span className="font-medium text-white/70 tabular-nums">{fmt(s.netIncome)}</span> (nómina − fijos)
+            </p>
+          )}
+        </div>
         <button
           onClick={onEdit}
           className="flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/75 transition-colors hover:border-cyan-400/40 hover:text-white"

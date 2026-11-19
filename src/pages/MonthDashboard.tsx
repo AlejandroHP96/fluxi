@@ -22,20 +22,36 @@ interface MonthDashboardProps {
 type ModalState = { kind: "new" } | { kind: "edit"; expense: Expense } | null
 
 const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
-  const { expenses, categories, income, loading, error, addExpense, updateExpense, deleteExpense, reassignExpenses, setIncome, saveCategories } = budget
+  const {
+    expenses,
+    categories,
+    fixedExpenses,
+    income,
+    loading,
+    error,
+    addExpense,
+    updateExpense,
+    deleteExpense,
+    reassignExpenses,
+    setIncome,
+    saveCategories,
+    saveFixedExpenses,
+  } = budget
   const [month, setMonth] = useState(currentMonthKey)
   const [modal, setModal] = useState<ModalState>(null)
   const [importing, setImporting] = useState(false)
-  const [editingCategories, setEditingCategories] = useState(false)
+  const [settingsTab, setSettingsTab] = useState<"categories" | "fixed" | null>(null)
 
   const monthExpenses = useMemo(() => expenses.filter((e) => e.date.startsWith(month)), [expenses, month])
   const summary = useMemo(
-    () => summarizeMonth(expenses, month, income[month] ?? null, categories),
-    [expenses, income, categories, month]
+    () => summarizeMonth(expenses, month, income[month] ?? null, categories, fixedExpenses),
+    [expenses, income, categories, fixedExpenses, month]
   )
 
   const closeModal = () => setModal(null)
   const openNew = () => setModal({ kind: "new" })
+  const openSettings = (tab: "categories" | "fixed" = "categories") => setSettingsTab(tab)
+  const closeSettings = () => setSettingsTab(null)
   // Gasto nuevo: hoy si estás en el mes actual; si no, el día 1 del mes que miras
   const defaultDate = summary.isCurrent ? todayKey() : `${month}-01`
   const firstTime = !loading && categories.length === 0
@@ -45,7 +61,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       email={email}
       onSignOut={onSignOut}
       onImport={() => setImporting(true)}
-      onCategories={() => setEditingCategories(true)}
+      onCategories={() => openSettings("categories")}
     />
   )
 
@@ -72,7 +88,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           <ImportWizard
             budget={budget}
             viewMonth={month}
-            onManageCategories={() => setEditingCategories(true)}
+            onManageCategories={() => openSettings("categories")}
             onClose={() => setImporting(false)}
           />
         )}
@@ -106,11 +122,12 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
                 summary={summary}
                 suggestedIncome={lastIncomeBefore(income, month)}
                 onSetIncome={setIncome}
+                onEditFixed={() => openSettings("fixed")}
               />
             )}
           </div>
           <div className="lg:col-start-1 lg:row-start-2">
-            {!loading && <Envelopes summary={summary} categories={categories} onEdit={() => setEditingCategories(true)} />}
+            {!loading && <Envelopes summary={summary} categories={categories} onEdit={() => openSettings("categories")} />}
           </div>
           <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
             <ExpenseList
@@ -139,7 +156,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         <ImportWizard
           budget={budget}
           viewMonth={month}
-          onManageCategories={() => setEditingCategories(true)}
+          onManageCategories={() => openSettings("categories")}
           onClose={(imported) => {
             setImporting(false)
             if (imported) setMonth(imported)
@@ -147,13 +164,16 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         />
       )}
 
-      {editingCategories && (
+      {settingsTab && (
         <CategorySettings
           categories={categories}
           expenses={expenses}
+          fixedExpenses={fixedExpenses}
+          initialTab={settingsTab}
           onSave={saveCategories}
+          onSaveFixedExpenses={saveFixedExpenses}
           onReassign={reassignExpenses}
-          onClose={() => setEditingCategories(false)}
+          onClose={closeSettings}
         />
       )}
 
@@ -162,7 +182,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           expense={modal.kind === "edit" ? modal.expense : null}
           month={month}
           categories={categories}
-          onManageCategories={() => setEditingCategories(true)}
+          onManageCategories={() => openSettings("categories")}
           defaultDate={defaultDate}
           onSave={async (data) => (modal.kind === "edit" ? updateExpense(modal.expense.id, data) : (await addExpense(data)) !== null)}
           onDelete={modal.kind === "edit" ? () => deleteExpense(modal.expense.id) : undefined}

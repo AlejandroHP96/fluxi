@@ -15,21 +15,28 @@ export type NewExpense = Pick<Expense, "amount" | "concept" | "category" | "date
 export interface BudgetCategory {
   id: string
   name: string
-  pct: number // % de la nómina (0-100)
+  pct: number // % del dinero restante tras gastos fijos (0-100)
   savings: boolean // ahorro: su parte se aparta y no se gasta
+}
+
+export interface FixedExpense {
+  id: string
+  name: string
+  amount: number // en € al mes
 }
 
 // Documento budgets/{uid}: un único reparto para todos los meses (cambiar los % recalcula también los pasados)
 export interface BudgetSettings {
   categories: BudgetCategory[]
   income: Record<string, number> // "YYYY-MM" -> nómina de ese mes en €
+  fixedExpenses?: FixedExpense[] // gastos fijos mensuales
 }
 
 export type EnvelopeStatus = "ok" | "casi" | "pasado"
 
 export interface EnvelopeSummary {
   category: BudgetCategory
-  allocated: number // nómina * pct / 100 (0 si no hay nómina)
+  allocated: number // base (nómina − fijos) * pct / 100 (0 si no hay nómina)
   spent: number
   remaining: number // puede ser negativo
   pctSpent: number // gastado / asignado * 100 (0 si no hay asignado)
@@ -41,12 +48,15 @@ export type MonthStatus = "sin-nomina" | "bien" | "ritmo-alto" | "pasado"
 export interface MonthSummary {
   month: string // "YYYY-MM"
   income: number | null // nómina del mes (null si aún no se ha apuntado)
+  fixedExpenses: FixedExpense[] // gastos fijos mensuales
+  totalFixed: number // suma de los gastos fijos
+  netIncome: number // nómina - gastos fijos (base para sobres, mín 0)
   totalPct: number // suma de los % de todas las categorías
   unassignedPct: number // 100 - totalPct (0 si se pasa de 100)
   unassigned: number // € sin asignar (dinero libre)
   saved: number // € apartados en categorías de ahorro
-  spendable: number // nómina - apartado (lo que hay para gastar, incluido lo sin asignar)
-  spent: number // todos los gastos del mes
+  spendable: number // nómina - fijos - ahorro (lo que hay para gastar, incluido lo sin asignar)
+  spent: number // todos los gastos del mes apuntados en sobres
   available: number // spendable - spent (negativo si te pasas)
   pctSpent: number // gastado / spendable * 100
   pctElapsed: number // % del mes transcurrido (100 en meses pasados, 0 en futuros)

@@ -1,5 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from "react"
-import { Pencil, Check, PiggyBank, CircleDashed } from "lucide-react"
+import { Pencil, Check, PiggyBank, CircleDashed, Receipt } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { monthLabel } from "../../utils/month"
 import type { MonthStatus, MonthSummary } from "../../types/budget"
@@ -9,6 +9,7 @@ interface IncomeCardProps {
   summary: MonthSummary
   suggestedIncome: number | null // la nómina más reciente anterior, para proponerla
   onSetIncome: (month: string, amount: number) => Promise<boolean>
+  onEditFixed?: () => void
 }
 
 const TONES: Record<MonthStatus, { text: string; bar: string; box: string; glow: string }> = {
@@ -121,7 +122,7 @@ const IncomeEditor = ({ month, initial, hint, onSave, onCancel }: EditorProps) =
   )
 }
 
-export const IncomeCard = ({ summary: s, suggestedIncome, onSetIncome }: IncomeCardProps) => {
+export const IncomeCard = ({ summary: s, suggestedIncome, onSetIncome, onEditFixed }: IncomeCardProps) => {
   const [editing, setEditing] = useState(false)
   const tone = TONES[s.status]
   const label = monthLabel(s.month)
@@ -232,15 +233,40 @@ export const IncomeCard = ({ summary: s, suggestedIncome, onSetIncome }: IncomeC
 
       <p className="-mt-2 text-xs leading-relaxed text-white/65">
         Para gastar <span className="font-semibold tabular-nums text-white/85">{fmt(s.spendable)}</span>{" "}
-        {s.saved > 0 ? `(nómina ${fmt(s.income)} − ${fmt(s.saved)} de ahorro)` : "(toda la nómina)"}
+        {s.totalFixed > 0 && s.saved > 0
+          ? `(nómina ${fmt(s.income)} − ${fmt(s.totalFixed)} fijos − ${fmt(s.saved)} ahorro)`
+          : s.totalFixed > 0
+            ? `(nómina ${fmt(s.income)} − ${fmt(s.totalFixed)} fijos)`
+            : s.saved > 0
+              ? `(nómina ${fmt(s.income)} − ${fmt(s.saved)} de ahorro)`
+              : "(toda la nómina)"}
       </p>
 
       {/* Mensaje */}
       <p className={`rounded-2xl border px-4 py-3 text-sm leading-relaxed ${tone.box}`}>{statusMessage(s)}</p>
 
-      {/* Apartado y sin asignar */}
-      {(s.saved > 0 || s.unassigned > 0.005) && (
+      {/* Apartado, gastos fijos y sin asignar */}
+      {(s.saved > 0 || s.totalFixed > 0 || s.unassigned > 0.005) && (
         <ul className="space-y-1.5 border-t border-white/[0.08] pt-4 text-sm">
+          {s.totalFixed > 0 && (
+            <li className="flex items-center justify-between gap-2 text-white/75">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 shrink-0 text-amber-300" />
+                <span>
+                  <span className="font-semibold tabular-nums text-white">{fmt(s.totalFixed)}</span> en gastos fijos
+                </span>
+              </div>
+              {onEditFixed && (
+                <button
+                  type="button"
+                  onClick={onEditFixed}
+                  className="rounded px-2 py-0.5 text-xs text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white"
+                >
+                  Editar
+                </button>
+              )}
+            </li>
+          )}
           {s.saved > 0 && (
             <li className="flex items-center gap-2 text-white/75">
               <PiggyBank className="h-4 w-4 shrink-0 text-cyan-300" />
