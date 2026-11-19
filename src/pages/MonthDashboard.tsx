@@ -1,15 +1,17 @@
 import { useMemo, useState } from "react"
 import { AlertTriangle, Plus } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
-import { budgetFor, currentMonthKey, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
+import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
 import type { Expense } from "../types/budget"
 import { AppHeader } from "../components/budget/AppHeader"
 import { MonthNav } from "../components/budget/MonthNav"
-import { BudgetCard } from "../components/budget/BudgetCard"
+import { IncomeCard } from "../components/budget/IncomeCard"
+import { Envelopes } from "../components/budget/Envelopes"
 import { ExpenseList } from "../components/budget/ExpenseList"
-import { CategoryBreakdown } from "../components/budget/CategoryBreakdown"
 import { ExpenseModal } from "../components/budget/ExpenseModal"
 import { ImportWizard } from "../components/budget/ImportWizard"
+import { CategorySettings } from "../components/budget/CategorySettings"
+import { FirstSetup } from "../components/budget/FirstSetup"
 
 interface MonthDashboardProps {
   email: string | null
@@ -20,27 +22,69 @@ interface MonthDashboardProps {
 type ModalState = { kind: "new" } | { kind: "edit"; expense: Expense } | null
 
 const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
-  const { expenses, history, loading, error, addExpense, updateExpense, deleteExpense, setBudget } = budget
+  const { expenses, categories, income, loading, error, addExpense, updateExpense, deleteExpense, reassignExpenses, setIncome, saveCategories } = budget
   const [month, setMonth] = useState(currentMonthKey)
   const [modal, setModal] = useState<ModalState>(null)
   const [importing, setImporting] = useState(false)
+  const [editingCategories, setEditingCategories] = useState(false)
 
   const monthExpenses = useMemo(() => expenses.filter((e) => e.date.startsWith(month)), [expenses, month])
   const summary = useMemo(
-    () => summarizeMonth(expenses, month, budgetFor(history, month)),
-    [expenses, history, month]
+    () => summarizeMonth(expenses, month, income[month] ?? null, categories),
+    [expenses, income, categories, month]
   )
 
   const closeModal = () => setModal(null)
   const openNew = () => setModal({ kind: "new" })
   // Gasto nuevo: hoy si estás en el mes actual; si no, el día 1 del mes que miras
   const defaultDate = summary.isCurrent ? todayKey() : `${month}-01`
+  const firstTime = !loading && categories.length === 0
+
+  const header = (
+    <AppHeader
+      email={email}
+      onSignOut={onSignOut}
+      onImport={() => setImporting(true)}
+      onCategories={() => setEditingCategories(true)}
+    />
+  )
+
+  const errorBanner = error && (
+    <div role="alert" className="flex items-start gap-2.5 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>Hay un problema con los datos: {error}</span>
+    </div>
+  )
+
+  // Primera vez: nómina + reparto propuesto
+  if (firstTime) {
+    return (
+      <div className="min-h-screen bg-[#07090e] text-white">
+        {header}
+        <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
+          {errorBanner}
+          <FirstSetup
+            month={month}
+            onSubmit={async (cats, amount) => (await saveCategories(cats)) && (await setIncome(month, amount))}
+          />
+        </main>
+        {importing && (
+          <ImportWizard
+            budget={budget}
+            viewMonth={month}
+            onManageCategories={() => setEditingCategories(true)}
+            onClose={() => setImporting(false)}
+          />
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#07090e] text-white">
-      <AppHeader email={email} onSignOut={onSignOut} onImport={() => setImporting(true)} />
+      {header}
 
-      <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-40 pt-5 sm:px-6 sm:pb-12 sm:pt-7">
+      <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-12 sm:pt-7">
         <MonthNav
           month={month}
           isCurrent={summary.isCurrent}
@@ -50,38 +94,43 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           onAdd={openNew}
         />
 
-        {error && (
-          <div role="alert" className="flex items-start gap-2.5 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Hay un problema con los datos: {error}</span>
-          </div>
-        )}
+        {errorBanner}
 
         <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:grid-rows-[auto_1fr] lg:items-start">
           <div className="lg:col-start-1 lg:row-start-1">
             {loading ? (
               <div className="h-80 animate-pulse rounded-3xl bg-white/[0.04]" aria-busy="true" />
             ) : (
-              <BudgetCard key={month} summary={summary} onSetBudget={setBudget} />
+              <IncomeCard
+                key={month}
+                summary={summary}
+                suggestedIncome={lastIncomeBefore(income, month)}
+                onSetIncome={setIncome}
+              />
             )}
           </div>
-          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
-            <ExpenseList expenses={monthExpenses} loading={loading} onSelect={(e) => setModal({ kind: "edit", expense: e })} onAdd={openNew} />
-          </div>
           <div className="lg:col-start-1 lg:row-start-2">
-            <CategoryBreakdown summary={summary} />
+            {!loading && <Envelopes summary={summary} categories={categories} onEdit={() => setEditingCategories(true)} />}
+          </div>
+          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <ExpenseList
+              expenses={monthExpenses}
+              categories={categories}
+              loading={loading}
+              onSelect={(e) => setModal({ kind: "edit", expense: e })}
+              onAdd={openNew}
+            />
           </div>
         </div>
       </main>
 
-      {/* Móvil: botón centrado abajo (no tapa la columna de importes) sobre un degradado que apaga la lista */}
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-30 h-28 bg-gradient-to-t from-[#07090e] via-[#07090e]/80 to-transparent sm:hidden" />
-      <div className="pointer-events-none fixed inset-x-0 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-40 flex justify-center sm:hidden">
+      {/* Móvil: barra inferior opaca a todo el ancho; su altura está reservada al final de la página */}
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#07090e] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:hidden">
         <button
           onClick={openNew}
-          className="liquid-button pointer-events-auto flex h-14 items-center gap-2 rounded-full px-7 text-base font-semibold text-[#04202a]"
+          className="liquid-button flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-semibold text-[#04202a]"
         >
-          <Plus className="h-6 w-6" strokeWidth={2.5} />
+          <Plus className="h-5 w-5" strokeWidth={2.5} />
           Apuntar gasto
         </button>
       </div>
@@ -90,6 +139,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         <ImportWizard
           budget={budget}
           viewMonth={month}
+          onManageCategories={() => setEditingCategories(true)}
           onClose={(imported) => {
             setImporting(false)
             if (imported) setMonth(imported)
@@ -97,10 +147,22 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         />
       )}
 
+      {editingCategories && (
+        <CategorySettings
+          categories={categories}
+          expenses={expenses}
+          onSave={saveCategories}
+          onReassign={reassignExpenses}
+          onClose={() => setEditingCategories(false)}
+        />
+      )}
+
       {modal && (
         <ExpenseModal
           expense={modal.kind === "edit" ? modal.expense : null}
           month={month}
+          categories={categories}
+          onManageCategories={() => setEditingCategories(true)}
           defaultDate={defaultDate}
           onSave={async (data) => (modal.kind === "edit" ? updateExpense(modal.expense.id, data) : (await addExpense(data)) !== null)}
           onDelete={modal.kind === "edit" ? () => deleteExpense(modal.expense.id) : undefined}

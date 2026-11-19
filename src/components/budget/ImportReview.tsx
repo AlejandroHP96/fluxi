@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react"
 import { Undo2, Check, SkipForward, AlertTriangle } from "lucide-react"
-import { CATEGORIES } from "../../constants/categories"
 import { conceptKey } from "../../utils/categorize"
 import { fmt } from "../../utils/formatters"
 import { SKIP, type ImportItem } from "../../utils/importQueue"
 import type { BudgetApi } from "../../hooks/useBudget"
+import { CategoryChip } from "./CategoryChip"
 import { catColor, longDate, shortDate } from "./helpers"
 
 export interface Decision {
@@ -24,17 +24,18 @@ interface ImportReviewProps {
 }
 
 export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: ImportReviewProps) => {
-  const { addExpense, deleteExpense, remember } = budget
+  const { addExpense, deleteExpense, remember, categories } = budget
+  const spendCats = categories.filter((c) => !c.savings)
   const [index, setIndex] = useState(0)
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [concept, setConcept] = useState(queue[0].concept)
-  const [choice, setChoice] = useState(queue[0].suggestion)
+  const [choice, setChoice] = useState<string | null>(queue[0].suggestion)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const item = queue[index]
 
-  const load = (i: number, c: string, ch: string) => {
+  const load = (i: number, c: string, ch: string | null) => {
     setIndex(i)
     setConcept(c)
     setChoice(ch)
@@ -43,6 +44,7 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
 
   const confirm = async () => {
     if (saving) return
+    if (choice === null) return setError("Elige una categoría antes de guardar.")
     const isSkip = choice === SKIP
     const finalConcept = concept.trim()
     if (!isSkip && !finalConcept) return setError("Pon un concepto antes de guardar.")
@@ -99,7 +101,7 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
     }
     if (tag === "INPUT" || tag === "TEXTAREA") return
     if (e.key === "0") setChoice(SKIP)
-    else if (/^[1-9]$/.test(e.key) && CATEGORIES[Number(e.key) - 1]) setChoice(CATEGORIES[Number(e.key) - 1])
+    else if (/^[1-9]$/.test(e.key) && spendCats[Number(e.key) - 1]) setChoice(spendCats[Number(e.key) - 1].id)
   }
   useEffect(() => {
     const h = (e: KeyboardEvent) => keyRef.current(e)
@@ -108,6 +110,7 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
   }, [])
 
   const isSkip = choice === SKIP
+  const selectedName = spendCats.find((c) => c.id === choice)?.name ?? ""
   const dup = item.duplicateOf
   const chip = "flex items-center gap-1.5 rounded-full border px-3.5 py-2.5 text-sm font-medium transition-all active:scale-95"
 
@@ -184,36 +187,27 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
 
       {/* Categoría */}
       <div className="mt-4 flex flex-wrap gap-2" role="radiogroup" aria-label="Categoría">
-        {CATEGORIES.map((c, i) => {
-          const active = c === choice
-          return (
-            <button
-              key={c}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => setChoice(c)}
-              className={`${chip} ${
-                active
-                  ? "border-cyan-300 bg-cyan-400/30 text-white shadow-[0_0_0_3px_rgba(34,211,238,0.22)]"
-                  : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/25 hover:text-white"
-              }`}
-            >
-              {active ? (
-                <Check className="h-3.5 w-3.5 text-cyan-200" strokeWidth={3} />
-              ) : (
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: catColor(c) }} />
-              )}
-              {c}
-              <kbd className="hidden text-[10px] font-normal text-white/50 md:inline">{i + 1}</kbd>
-            </button>
-          )
-        })}
+        {spendCats.map((c, i) => (
+          <CategoryChip
+            key={c.id}
+            label={c.name}
+            color={catColor(categories, c)}
+            active={c.id === choice}
+            onClick={() => {
+              setChoice(c.id)
+              setError(null)
+            }}
+            hint={i < 9 ? <kbd className="hidden text-[10px] font-normal text-white/50 md:inline">{i + 1}</kbd> : undefined}
+          />
+        ))}
         <button
           type="button"
           role="radio"
           aria-checked={isSkip}
-          onClick={() => setChoice(SKIP)}
+          onClick={() => {
+            setChoice(SKIP)
+            setError(null)
+          }}
           className={`${chip} ${
             isSkip
               ? "border-amber-300 bg-amber-400/30 text-amber-50 shadow-[0_0_0_3px_rgba(251,191,36,0.22)]"
@@ -242,15 +236,23 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
         <button
           type="button"
           onClick={() => void confirm()}
-          disabled={saving}
+          disabled={saving || choice === null}
           className={`flex items-center justify-center gap-2 rounded-xl px-5 py-4 text-base font-semibold disabled:opacity-60 sm:ml-auto sm:min-w-[15rem] ${
-            isSkip
-              ? "border border-white/25 bg-white/[0.08] text-white transition-colors hover:bg-white/[0.14]"
-              : "liquid-button text-[#04202a]"
+            choice === null
+              ? "border border-white/20 bg-white/[0.06] text-white/70"
+              : isSkip
+                ? "border border-white/25 bg-white/[0.08] text-white transition-colors hover:bg-white/[0.14]"
+                : "liquid-button text-[#04202a]"
           }`}
         >
-          {isSkip ? <SkipForward className="h-4 w-4" /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
-          {saving ? "Guardando…" : isSkip ? "Omitir este gasto" : `Guardar en ${choice}`}
+          {choice === null ? null : isSkip ? <SkipForward className="h-4 w-4" /> : <Check className="h-4 w-4" strokeWidth={2.5} />}
+          {saving
+            ? "Guardando…"
+            : choice === null
+              ? "Elige una categoría"
+              : isSkip
+                ? "Omitir este gasto"
+                : `Guardar en ${selectedName}`}
         </button>
       </div>
       <p className="mt-3 hidden text-center text-xs text-white/55 md:block">Enter confirma · 1-9 elige categoría · 0 omite</p>

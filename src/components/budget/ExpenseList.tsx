@@ -1,18 +1,19 @@
 import { useMemo } from "react"
 import { Plus } from "lucide-react"
 import { fmt } from "../../utils/formatters"
-import { todayKey } from "../../utils/month"
-import type { Expense } from "../../types/budget"
+import { resolveCategory, todayKey } from "../../utils/month"
+import type { BudgetCategory, Expense } from "../../types/budget"
 import { catColor, dayLabel } from "./helpers"
 
 interface ExpenseListProps {
+  categories: BudgetCategory[]
   expenses: Expense[] // ya filtrados por mes y ordenados (más recientes primero)
   loading: boolean
   onSelect: (e: Expense) => void
   onAdd: () => void
 }
 
-export const ExpenseList = ({ expenses, loading, onSelect, onAdd }: ExpenseListProps) => {
+export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: ExpenseListProps) => {
   const groups = useMemo(() => {
     const map = new Map<string, Expense[]>()
     for (const e of expenses) map.set(e.date, [...(map.get(e.date) ?? []), e])
@@ -51,21 +52,24 @@ export const ExpenseList = ({ expenses, loading, onSelect, onAdd }: ExpenseListP
                 <span className="text-xs tabular-nums text-white/60">{fmt(g.total)}</span>
               </div>
               <ul className="divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.025]">
-                {g.items.map((e) => (
+                {g.items.map((e) => {
+                  const cat = resolveCategory(e.category, categories)
+                  return (
                   <li key={e.id}>
                     <button
                       onClick={() => onSelect(e)}
                       className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.05] active:bg-white/[0.08]"
                     >
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: catColor(e.category) }} />
+                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: catColor(categories, cat) }} />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[15px] font-medium">{e.concept}</span>
-                        <span className="block text-xs text-white/60">{e.category}</span>
+                        <span className="block text-xs text-white/60">{cat?.name ?? "Sin categoría"}</span>
                       </span>
                       <span className="shrink-0 text-[15px] font-semibold tabular-nums">{fmt(e.amount)}</span>
                     </button>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             </div>
           ))}

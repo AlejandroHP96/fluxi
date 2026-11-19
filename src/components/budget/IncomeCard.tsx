@@ -1,13 +1,14 @@
 import { useState, type FormEvent, type ReactNode } from "react"
-import { Pencil, Check } from "lucide-react"
+import { Pencil, Check, PiggyBank, CircleDashed } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { monthLabel } from "../../utils/month"
 import type { MonthStatus, MonthSummary } from "../../types/budget"
 import { parseAmount } from "./helpers"
 
-interface BudgetCardProps {
+interface IncomeCardProps {
   summary: MonthSummary
-  onSetBudget: (month: string, amount: number) => Promise<boolean>
+  suggestedIncome: number | null // la nómina más reciente anterior, para proponerla
+  onSetIncome: (month: string, amount: number) => Promise<boolean>
 }
 
 const TONES: Record<MonthStatus, { text: string; bar: string; box: string; glow: string }> = {
@@ -29,7 +30,7 @@ const TONES: Record<MonthStatus, { text: string; bar: string; box: string; glow:
     box: "border-red-400/30 bg-red-500/[0.10] text-red-100",
     glow: "rgba(248, 113, 113, 0.17)",
   },
-  "sin-presupuesto": {
+  "sin-nomina": {
     text: "text-cyan-300",
     bar: "from-cyan-400 to-sky-500",
     box: "border-cyan-400/25 bg-cyan-400/[0.07] text-cyan-100",
@@ -40,17 +41,17 @@ const TONES: Record<MonthStatus, { text: string; bar: string; box: string; glow:
 const dias = (n: number) => `${n} ${n === 1 ? "día" : "días"}`
 
 function statusMessage(s: MonthSummary): string {
-  if (s.budget === null) return ""
-  const over = -s.remaining
+  if (s.income === null) return ""
+  const over = -s.available
   if (s.isPast) {
     return s.status === "pasado"
-      ? `Mes cerrado fuera del presupuesto: te pasaste ${fmt(over)}.`
-      : `Mes cerrado dentro del presupuesto: te sobraron ${fmt(s.remaining)}.`
+      ? `Mes cerrado gastando de más: te pasaste ${fmt(over)}.`
+      : `Mes cerrado dentro de lo que tenías para gastar: te sobraron ${fmt(s.available)}.`
   }
   if (!s.isCurrent) return "Este mes aún no ha empezado."
-  if (s.status === "pasado") return `Has superado el presupuesto por ${fmt(over)}. Cada gasto nuevo suma.`
+  if (s.status === "pasado") return `Has gastado ${fmt(over)} más de lo que tenías para gastar. Cada gasto nuevo suma.`
   const daily = s.dailyAllowance ?? 0
-  if (daily < 0.005) return "Has gastado justo todo el presupuesto. Hasta fin de mes, mejor no gastar más."
+  if (daily < 0.005) return "Has gastado justo todo lo disponible. Hasta fin de mes, mejor no gastar más."
   if (s.status === "ritmo-alto")
     return `Vas algo por encima del ritmo del mes: para llegar a fin de mes te quedan ${fmt(daily)} al día (${dias(s.daysLeft)}).`
   return `Vas bien: puedes gastar ${fmt(daily)} al día hasta fin de mes (${dias(s.daysLeft)}).`
@@ -59,11 +60,12 @@ function statusMessage(s: MonthSummary): string {
 interface EditorProps {
   month: string
   initial: number | null
+  hint?: string
   onSave: (amount: number) => Promise<boolean>
   onCancel?: () => void
 }
 
-const BudgetEditor = ({ month, initial, onSave, onCancel }: EditorProps) => {
+const IncomeEditor = ({ month, initial, hint, onSave, onCancel }: EditorProps) => {
   const [value, setValue] = useState(initial !== null ? String(initial).replace(".", ",") : "")
   const [saving, setSaving] = useState(false)
   const [invalid, setInvalid] = useState(false)
@@ -91,7 +93,7 @@ const BudgetEditor = ({ month, initial, onSave, onCancel }: EditorProps) => {
               setInvalid(false)
             }}
             placeholder="0,00"
-            aria-label="Presupuesto mensual"
+            aria-label={`Nómina de ${monthLabel(month)}`}
             className={`glass-input w-full rounded-xl py-3 pl-4 pr-9 text-lg font-semibold tabular-nums ${invalid ? "!border-red-400/70" : ""}`}
           />
           <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/60">€</span>
@@ -108,20 +110,18 @@ const BudgetEditor = ({ month, initial, onSave, onCancel }: EditorProps) => {
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl px-3 text-sm text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white"
+            className="rounded-xl px-3 text-sm text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
           >
             Cancelar
           </button>
         )}
       </div>
-      <p className="text-xs text-white/60">
-        {invalid ? "Escribe un importe mayor que 0." : `Se aplica desde ${monthLabel(month)} en adelante. Los meses anteriores no cambian.`}
-      </p>
+      <p className="text-xs text-white/60">{invalid ? "Escribe un importe mayor que 0." : hint ?? `Es la nómina de ${monthLabel(month)}.`}</p>
     </form>
   )
 }
 
-export const BudgetCard = ({ summary: s, onSetBudget }: BudgetCardProps) => {
+export const IncomeCard = ({ summary: s, suggestedIncome, onSetIncome }: IncomeCardProps) => {
   const [editing, setEditing] = useState(false)
   const tone = TONES[s.status]
   const label = monthLabel(s.month)
@@ -135,18 +135,25 @@ export const BudgetCard = ({ summary: s, onSetBudget }: BudgetCardProps) => {
     </section>
   )
 
-  // Sin presupuesto: llamada clara a fijarlo
-  if (s.budget === null) {
+  // Sin nómina: llamada clara a apuntarla
+  if (s.income === null) {
     return shell(
       <div className="space-y-5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">Primer paso</p>
-          <h2 className="mt-1.5 text-2xl font-bold tracking-tight">¿Cuánto quieres gastar en {label}?</h2>
-          <p className="mt-1 text-sm text-white/50">Fija un presupuesto mensual y te diré si vas bien o te estás pasando.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-300">Primer paso del mes</p>
+          <h2 className="mt-1.5 text-2xl font-bold tracking-tight">
+            {s.isPast || s.isCurrent ? `¿Cuánto has cobrado en ${label}?` : `¿Cuánto vas a cobrar en ${label}?`}
+          </h2>
+          <p className="mt-1 text-sm text-white/65">Con la nómina reparto el dinero entre tus categorías y te digo cuánto te queda en cada una.</p>
         </div>
-        <BudgetEditor month={s.month} initial={null} onSave={(a) => onSetBudget(s.month, a)} />
+        <IncomeEditor
+          month={s.month}
+          initial={suggestedIncome}
+          hint={suggestedIncome !== null ? "Te propongo tu última nómina; cámbiala si es otra." : undefined}
+          onSave={(a) => onSetIncome(s.month, a)}
+        />
         {s.spent > 0 && (
-          <p className="text-sm text-white/55">
+          <p className="text-sm text-white/65">
             Llevas gastado <span className="font-semibold text-white">{fmt(s.spent)}</span> este mes.
           </p>
         )}
@@ -154,32 +161,32 @@ export const BudgetCard = ({ summary: s, onSetBudget }: BudgetCardProps) => {
     )
   }
 
-  const over = s.remaining < 0
+  const over = s.available < 0
   const headline = s.isPast ? (over ? "Te pasaste" : "Sobraron") : over ? "Te has pasado" : "Te quedan"
-  const barPct = Math.min(100, s.pctSpent)
+  const barPct = s.spendable > 0 ? Math.min(100, s.pctSpent) : s.spent > 0 ? 100 : 0
 
   return shell(
     <div className="space-y-6">
-      {/* Presupuesto */}
+      {/* Nómina */}
       {editing ? (
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">Presupuesto de {label}</p>
-          <BudgetEditor
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">Nómina de {label}</p>
+          <IncomeEditor
             month={s.month}
-            initial={s.budget}
-            onSave={(a) => onSetBudget(s.month, a)}
+            initial={s.income}
+            onSave={(a) => onSetIncome(s.month, a)}
             onCancel={() => setEditing(false)}
           />
         </div>
       ) : (
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
-            Presupuesto <span className="ml-1 text-sm normal-case tracking-normal text-white/80 tabular-nums">{fmt(s.budget)}</span>
+            Nómina <span className="ml-1 text-sm normal-case tracking-normal tabular-nums text-white/85">{fmt(s.income)}</span>
           </p>
           <button
             onClick={() => setEditing(true)}
-            aria-label="Editar presupuesto"
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/55 transition-colors hover:bg-white/[0.07] hover:text-white"
+            aria-label="Editar nómina"
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white/65 transition-colors hover:bg-white/[0.07] hover:text-white"
           >
             <Pencil className="h-3.5 w-3.5" />
             Editar
@@ -187,12 +194,10 @@ export const BudgetCard = ({ summary: s, onSetBudget }: BudgetCardProps) => {
         </div>
       )}
 
-      {/* Cifra principal */}
+      {/* Cifra principal: disponible */}
       <div>
-        <p className="text-sm text-white/55">{headline}</p>
-        <p className={`mt-0.5 text-5xl font-bold tabular-nums tracking-tight sm:text-6xl ${tone.text}`}>
-          {fmt(Math.abs(s.remaining))}
-        </p>
+        <p className="text-sm text-white/65">{headline}</p>
+        <p className={`mt-0.5 text-5xl font-bold tabular-nums tracking-tight sm:text-6xl ${tone.text}`}>{fmt(Math.abs(s.available))}</p>
       </div>
 
       {/* Barra con marca de ritmo esperado */}
@@ -213,21 +218,47 @@ export const BudgetCard = ({ summary: s, onSetBudget }: BudgetCardProps) => {
           )}
         </div>
         <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
-          <p className="text-white/55">
+          <p className="text-white/65">
             Gastado <span className="font-semibold text-white tabular-nums">{fmt(s.spent)}</span>
-            <span className="ml-1.5 text-white/60">· {Math.round(s.pctSpent)} %</span>
           </p>
           {s.isCurrent && (
-            <p className="flex items-center gap-1.5 text-xs text-white/60">
+            <p className="flex shrink-0 items-center gap-1.5 text-xs text-white/65">
               <span className="inline-block h-3 w-[3px] rounded-full bg-white" />
-              Ritmo esperado {Math.round(s.pctElapsed)} %
+              Ritmo {Math.round(s.pctElapsed)} %
             </p>
           )}
         </div>
       </div>
 
+      <p className="-mt-2 text-xs leading-relaxed text-white/65">
+        Para gastar <span className="font-semibold tabular-nums text-white/85">{fmt(s.spendable)}</span>{" "}
+        {s.saved > 0 ? `(nómina ${fmt(s.income)} − ${fmt(s.saved)} de ahorro)` : "(toda la nómina)"}
+      </p>
+
       {/* Mensaje */}
       <p className={`rounded-2xl border px-4 py-3 text-sm leading-relaxed ${tone.box}`}>{statusMessage(s)}</p>
+
+      {/* Apartado y sin asignar */}
+      {(s.saved > 0 || s.unassigned > 0.005) && (
+        <ul className="space-y-1.5 border-t border-white/[0.08] pt-4 text-sm">
+          {s.saved > 0 && (
+            <li className="flex items-center gap-2 text-white/75">
+              <PiggyBank className="h-4 w-4 shrink-0 text-cyan-300" />
+              <span>
+                Apartas <span className="font-semibold tabular-nums text-white">{fmt(s.saved)}</span> para ahorro
+              </span>
+            </li>
+          )}
+          {s.unassigned > 0.005 && (
+            <li className="flex items-center gap-2 text-white/75">
+              <CircleDashed className="h-4 w-4 shrink-0 text-white/60" />
+              <span>
+                <span className="font-semibold tabular-nums text-white">{fmt(s.unassigned)}</span> sin asignar ({Math.round(s.unassignedPct * 10) / 10} %)
+              </span>
+            </li>
+          )}
+        </ul>
+      )}
     </div>
   )
 }

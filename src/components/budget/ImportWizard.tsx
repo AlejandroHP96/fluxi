@@ -12,12 +12,13 @@ import { ImportReview, type Decision } from "./ImportReview"
 interface ImportWizardProps {
   budget: BudgetApi
   viewMonth: string // mes que se está viendo en el dashboard
+  onManageCategories: () => void
   onClose: (importedMonth?: string) => void // con mes si se guardó algo, para saltar a él
 }
 
 type Step = "upload" | "month" | "ventajon" | "review" | "summary"
 
-export const ImportWizard = ({ budget, viewMonth, onClose }: ImportWizardProps) => {
+export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }: ImportWizardProps) => {
   const [step, setStep] = useState<Step>("upload")
   const [rows, setRows] = useState<CsvExpense[]>([])
   const [month, setMonth] = useState("")
@@ -74,7 +75,7 @@ export const ImportWizard = ({ budget, viewMonth, onClose }: ImportWizardProps) 
   }
 
   const startReview = async () => {
-    let q = buildImportQueue(rows, month, budget.expenses, budget.memory)
+    let q = buildImportQueue(rows, month, budget.expenses, budget.memory, budget.categories)
     setWarning(null)
     setDecisions([])
     const vMonths = ventajonMonths(q)
@@ -82,7 +83,7 @@ export const ImportWizard = ({ budget, viewMonth, onClose }: ImportWizardProps) 
       setStep("ventajon")
       try {
         const purchases = await fetchVentajonPurchases(vMonths)
-        q = applyVentajon(q, purchases, budget.memory)
+        q = applyVentajon(q, purchases, budget.memory, budget.categories)
       } catch (e) {
         setWarning(`No se pudo consultar Ventajón: ${(e as Error).message}; se quedan como «Ventajon».`)
       }
@@ -136,7 +137,23 @@ export const ImportWizard = ({ budget, viewMonth, onClose }: ImportWizardProps) 
           </div>
         )}
 
-        {step === "upload" && (
+        {budget.categories.every((c) => c.savings) && (
+          <div className="py-4 text-center">
+            <p className="text-base text-white/85">Antes de importar necesitas al menos una categoría de gasto.</p>
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                onManageCategories()
+              }}
+              className="liquid-button mt-5 w-full rounded-xl px-5 py-3.5 text-base font-semibold text-[#04202a]"
+            >
+              Crear categorías
+            </button>
+          </div>
+        )}
+
+        {step === "upload" && !budget.categories.every((c) => c.savings) && (
           <div>
             <button
               type="button"

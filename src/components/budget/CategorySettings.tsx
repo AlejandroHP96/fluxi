@@ -1,0 +1,181 @@
+import { useEffect, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
+import { X } from "lucide-react"
+import { resolveCategory } from "../../utils/month"
+import type { BudgetCategory, Expense } from "../../types/budget"
+import { CategoryEditor } from "./CategoryEditor"
+import { fromDraft, toDraft, validateDraft, type DraftCat } from "./categoryDraft"
+
+interface CategorySettingsProps {
+  categories: BudgetCategory[]
+  expenses: Expense[]
+  onSave: (list: BudgetCategory[]) => Promise<boolean>
+  onReassign: (ids: string[], categoryId: string) => Promise<boolean>
+  onClose: () => void
+}
+
+interface PendingDelete {
+  row: DraftCat
+  count: number
+  target: string // id de destino o "" = dejarlos sin categoría
+}
+
+export const CategorySettings = ({ categories, expenses, onSave, onReassign, onClose }: CategorySettingsProps) => {
+  const [draft, setDraft] = useState<DraftCat[]>(() => toDraft(categories))
+  const [pending, setPending] = useState<PendingDelete | null>(null)
+  const [moves, setMoves] = useState<Array<{ from: string; to: string }>>([]) // categoría borrada -> destino
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose()
+    window.addEventListener("keydown", onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      window.removeEventListener("keydown", onKey)
+      document.body.style.overflow = prev
+    }
+  }, [onClose])
+
+  // Gastos de cada categoría guardada (ids antiguos y nombres incluidos)
+  const idsByCategory = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const e of expenses) {
+      const c = resolveCategory(e.category, categories)
+      if (c) map.set(c.id, [...(map.get(c.id) ?? []), e.id])
+    }
+    return map
+  }, [expenses, categories])
+
+  const remove = (id: string) => setDraft((d) => d.filter((x) => x.id !== id))
+
+  const requestDelete = (row: DraftCat) => {
+    const count = row.isNew ? 0 : (idsByCategory.get(row.id)?.length ?? 0)
+    if (count === 0) return remove(row.id)
+    const firstOther = draft.find((d) => d.id !== row.id && !d.savings && d.name.trim())
+    setPending({ row, count, target: firstOther?.id ?? "" })
+  }
+
+  const confirmDelete = () => {
+    if (!pending) return
+    if (pending.target) setMoves((m) => [...m, { from: pending.row.id, to: pending.target }])
+    remove(pending.row.id)
+    setPending(null)
+  }
+
+  const save = async () => {
+    const problem = validateDraft(draft)
+    if (problem) return setError(problem)
+    setError(null)
+    setBusy(true)
+    const list = fromDraft(draft)
+    if (!(await onSave(list))) {
+      setBusy(false)
+      return setError("No se pudo guardar. Inténtalo de nuevo.")
+    }
+    // Mover los gastos de las categorías borradas, solo a destinos que siguen existiendo
+    for (const m of moves) {
+      const ids = idsByCategory.get(m.from) ?? []
+      if (ids.length && list.some((c) => c.id === m.to)) await onReassign(ids, m.to)
+    }
+    onClose()
+  }
+
+  const targets = pending ? draft.filter((d) => d.id !== pending.row.id && d.name.trim()) : []
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        role="dialog"
+        aria-label="Categorías y reparto"
+        className="glass-panel fade-up flex max-h-[94dvh] w-full max-w-lg flex-col rounded-t-3xl sm:rounded-3xl"
+      >
+        <div className="flex items-start justify-between gap-3 px-5 pb-3 pt-5 sm:px-6 sm:pt-6">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Categorías y reparto</h2>
+            <p className="mt-0.5 text-sm text-white/65">
+              Cada categoría se lleva un % de tu nómina. Vale para todos los meses: si lo cambias, se recalculan también los pasados.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="rounded-lg p-1.5 text-white/60 transition-colors hover:bg-white/[0.07] hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 pb-2 sm:px-6">
+          <CategoryEditor draft={draft} onChange={setDraft} onDelete={requestDelete} sticky />
+        </div>
+
+        <div className="space-y-3 border-t border-white/[0.08] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-6">
+          {pending && (
+            <div className="space-y-3 rounded-2xl border border-amber-400/30 bg-amber-400/[0.09] p-4 text-sm text-amber-50">
+              <p>
+                «{pending.row.name.trim() || "Esta categoría"}» tiene {pending.count} {pending.count === 1 ? "gasto" : "gastos"}. ¿Qué hago con
+                {pending.count === 1 ? " él" : " ellos"}?
+              </p>
+              <select
+                value={pending.target}
+                onChange={(e) => setPending({ ...pending, target: e.target.value })}
+                aria-label="Destino de los gastos"
+                className="glass-input w-full rounded-xl px-3 py-2.5 text-base [&>option]:bg-[#0b1020]"
+              >
+                {targets.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    Moverlos a {t.name.trim()}
+                  </option>
+                ))}
+                <option value="">Dejarlos sin categoría</option>
+              </select>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={confirmDelete}
+                  className="rounded-xl bg-red-500/90 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-red-500"
+                >
+                  Borrar categoría
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPending(null)}
+                  className="rounded-xl border border-white/25 px-4 py-2.5 font-medium text-white/85 transition-colors hover:bg-white/10"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-300">{error}</p>}
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/20 bg-white/[0.05] px-4 py-3 text-sm font-medium text-white/85 transition-colors hover:bg-white/[0.1] hover:text-white"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={busy}
+              className="liquid-button ml-auto flex-1 rounded-xl px-5 py-3.5 text-base font-semibold text-[#04202a] disabled:opacity-60 sm:flex-none sm:min-w-[10rem]"
+            >
+              {busy ? "Guardando…" : "Guardar reparto"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}

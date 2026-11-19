@@ -1,27 +1,30 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
-import { X, Trash2, Check } from "lucide-react"
-import { CATEGORIES } from "../../constants/categories"
-import { daysInMonth } from "../../utils/month"
-import type { Expense, NewExpense } from "../../types/budget"
+import { X, Trash2 } from "lucide-react"
+import { daysInMonth, resolveCategory } from "../../utils/month"
+import type { BudgetCategory, Expense, NewExpense } from "../../types/budget"
+import { CategoryChip } from "./CategoryChip"
 import { catColor, getLastCategory, parseAmount, saveLastCategory } from "./helpers"
 
 interface ExpenseModalProps {
   expense: Expense | null // null = gasto nuevo
   month: string // mes que se está viendo
+  categories: BudgetCategory[] // las del usuario
+  onManageCategories: () => void
   defaultDate: string // fecha por defecto del gasto nuevo
   onSave: (data: NewExpense) => Promise<boolean>
   onDelete?: () => Promise<boolean>
   onClose: () => void
 }
 
-export const ExpenseModal = ({ expense, month, defaultDate, onSave, onDelete, onClose }: ExpenseModalProps) => {
+export const ExpenseModal = ({ expense, month, categories, onManageCategories, defaultDate, onSave, onDelete, onClose }: ExpenseModalProps) => {
   const editing = expense !== null
+  const spendCats = categories.filter((c) => !c.savings)
   const [amount, setAmount] = useState(editing ? String(expense.amount).replace(".", ",") : "")
   const [concept, setConcept] = useState(expense?.concept ?? "")
-  const [category, setCategory] = useState(expense?.category ?? getLastCategory())
+  const [category, setCategory] = useState(expense ? (resolveCategory(expense.category, categories)?.id ?? "") : getLastCategory(spendCats))
   const [date, setDate] = useState(expense?.date ?? defaultDate)
-  const [errors, setErrors] = useState<{ amount?: boolean; concept?: boolean; date?: boolean }>({})
+  const [errors, setErrors] = useState<{ amount?: boolean; concept?: boolean; date?: boolean; category?: boolean }>({})
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -41,9 +44,9 @@ export const ExpenseModal = ({ expense, month, defaultDate, onSave, onDelete, on
     e.preventDefault()
     if (busy) return
     const n = parseAmount(amount)
-    const errs = { amount: !(n > 0), concept: !concept.trim(), date: !/^\d{4}-\d{2}-\d{2}$/.test(date) }
+    const errs = { amount: !(n > 0), concept: !concept.trim(), date: !/^\d{4}-\d{2}-\d{2}$/.test(date), category: !category }
     setErrors(errs)
-    if (errs.amount || errs.concept || errs.date) return
+    if (errs.amount || errs.concept || errs.date || errs.category) return
     setBusy(true)
     setFailed(false)
     const ok = await onSave({ amount: Math.round(n * 100) / 100, concept: concept.trim(), category, date })
@@ -67,6 +70,37 @@ export const ExpenseModal = ({ expense, month, defaultDate, onSave, onDelete, on
     }
   }
 
+  // Chips: categorías de gasto (y la del gasto que se edita, aunque sea de ahorro)
+  const chips = categories.filter((c) => !c.savings || c.id === category)
+
+  if (!editing && spendCats.length === 0) {
+    return createPortal(
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center sm:p-4"
+        onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+      >
+        <div role="dialog" className="glass-panel fade-up w-full max-w-md rounded-t-3xl p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center sm:rounded-3xl">
+          <h2 className="text-lg font-semibold tracking-tight">Primero crea tus categorías</h2>
+          <p className="mt-2 text-sm text-white/65">Para apuntar un gasto necesitas al menos una categoría de gasto (no de ahorro).</p>
+          <button
+            type="button"
+            onClick={() => {
+              onClose()
+              onManageCategories()
+            }}
+            className="liquid-button mt-5 w-full rounded-xl px-5 py-3.5 text-base font-semibold text-[#04202a]"
+          >
+            Crear categorías
+          </button>
+          <button type="button" onClick={onClose} className="mt-2 w-full rounded-xl px-5 py-3 text-sm text-white/70 hover:text-white">
+            Ahora no
+          </button>
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
   const field = "glass-input w-full rounded-xl px-4 py-3 text-base"
   const bad = "!border-red-400/70"
 
@@ -87,7 +121,7 @@ export const ExpenseModal = ({ expense, month, defaultDate, onSave, onDelete, on
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="rounded-lg p-1.5 text-white/50 transition-colors hover:bg-white/[0.07] hover:text-white"
+            className="rounded-lg p-1.5 text-white/60 transition-colors hover:bg-white/[0.07] hover:text-white"
           >
             <X className="h-5 w-5" />
           </button>
@@ -107,7 +141,7 @@ export const ExpenseModal = ({ expense, month, defaultDate, onSave, onDelete, on
             aria-label="Importe"
             className={`glass-input w-full rounded-2xl py-4 pl-5 pr-12 text-4xl font-bold tabular-nums ${errors.amount ? bad : ""}`}
           />
-          <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-2xl text-white/35">€</span>
+          <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-2xl text-white/60">€</span>
         </div>
         {errors.amount && <p className="mt-1.5 text-xs text-red-300">Escribe un importe mayor que 0.</p>}
 
@@ -126,31 +160,22 @@ export const ExpenseModal = ({ expense, month, defaultDate, onSave, onDelete, on
           {errors.concept && <p className="mt-1.5 text-xs text-red-300">Pon un concepto.</p>}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2" role="radiogroup" aria-label="Categoría">
-          {CATEGORIES.map((c) => {
-            const active = c === category
-            return (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setCategory(c)}
-                className={`flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-sm font-medium transition-all active:scale-95 ${
-                  active
-                    ? "border-cyan-300 bg-cyan-400/30 text-white shadow-[0_0_0_3px_rgba(34,211,238,0.22)]"
-                    : "border-white/10 bg-white/[0.03] text-white/65 hover:border-white/25 hover:text-white"
-                }`}
-              >
-                {active ? (
-                  <Check className="h-3.5 w-3.5 text-cyan-200" strokeWidth={3} />
-                ) : (
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: catColor(c) }} />
-                )}
-                {c}
-              </button>
-            )
-          })}
+        <div className="mt-4">
+          <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Categoría">
+            {chips.map((c) => (
+              <CategoryChip
+                key={c.id}
+                label={c.name}
+                color={catColor(categories, c)}
+                active={c.id === category}
+                onClick={() => {
+                  setCategory(c.id)
+                  setErrors((x) => ({ ...x, category: false }))
+                }}
+              />
+            ))}
+          </div>
+          {errors.category && <p className="mt-1.5 text-xs text-red-300">Elige una categoría.</p>}
         </div>
 
         <div className="mt-4">

@@ -1,4 +1,4 @@
-import { CATEGORIES, CAT_COLORS } from "../../constants/categories"
+import type { BudgetCategory } from "../../types/budget"
 
 // Acepta "12,50", "12.5" y "1.200" / "1.200,50" (puntos de millares)
 export const parseAmount = (raw: string): number => {
@@ -9,19 +9,32 @@ export const parseAmount = (raw: string): number => {
   return /^\d*\.?\d+$|^\d+\.$/.test(s) ? Number(s) : NaN
 }
 
-export const catColor = (category: string): string => {
-  const i = CATEGORIES.indexOf(category)
-  return CAT_COLORS[(i < 0 ? CATEGORIES.length - 1 : i) % CAT_COLORS.length]
+// Paleta de categorías: sin verde, ámbar ni rojo (son los colores de estado) y sin repetir en consecutivas
+// Categorías de gasto: sin verde, ámbar ni rojo (son los colores de estado) y sin el cian del ahorro
+const CATEGORY_PALETTE = ["#a78bfa", "#f472b6", "#60a5fa", "#e879f9", "#818cf8", "#c084fc", "#93c5fd", "#94a3b8"]
+// Ahorro: siempre cian, para distinguirlo de las de gasto
+const SAVINGS_COLOR = "#22d3ee"
+
+// Color por posición en la lista de categorías del usuario (gris si ya no existe)
+export const catColor = (categories: BudgetCategory[], category: BudgetCategory | string | null | undefined): string => {
+  const id = typeof category === "string" ? category : category?.id
+  const found = categories.find((c) => c.id === id)
+  if (!found) return "#6b7280"
+  if (found.savings) return SAVINGS_COLOR
+  // Posición entre las de gasto, para que el color no cambie al marcar/desmarcar una de ahorro
+  const i = categories.filter((c) => !c.savings).findIndex((c) => c.id === id)
+  return CATEGORY_PALETTE[i % CATEGORY_PALETTE.length]
 }
 
 const LAST_CAT_KEY = "fluxi_last_category"
 
-export const getLastCategory = (): string => {
+// Última categoría usada al apuntar un gasto, si sigue existiendo entre las dadas ("" si no hay)
+export const getLastCategory = (valid: BudgetCategory[]): string => {
   try {
     const c = localStorage.getItem(LAST_CAT_KEY)
-    return c && CATEGORIES.includes(c) ? c : "Otro"
+    return c && valid.some((x) => x.id === c) ? c : ""
   } catch {
-    return "Otro"
+    return ""
   }
 }
 
