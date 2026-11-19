@@ -2,7 +2,7 @@ import { useState, useRef, ChangeEvent } from "react"
 import { Camera, Image as ImageIcon, Loader2 } from "lucide-react"
 import { CATEGORIES } from "../../constants/categories"
 import { compressImage } from "../../utils/imageUtils"
-import type { NewTransaction, TransactionType } from "../../types"
+import type { NewTransaction, Transaction, TransactionType } from "../../types"
 
 interface FormState {
   description: string
@@ -20,13 +20,23 @@ const EMPTY: FormState = {
   date: new Date().toISOString().split("T")[0],
 }
 
+// Edición: el formulario solo maneja el día; la hora original ("YYYY-MM-DD HH:mm") se conserva al guardar
+const fromTransaction = (tx: Transaction): FormState => ({
+  description: tx.description,
+  amount: String(Math.abs(Number(tx.amount))),
+  category: tx.type === "expense" ? tx.category : EMPTY.category,
+  type: tx.type,
+  date: tx.date.split(" ")[0],
+})
+
 interface AddTransactionModalProps {
   onClose: () => void
-  onAdd: (tx: NewTransaction) => Promise<boolean>
+  onSave: (tx: NewTransaction) => Promise<boolean>
+  initial?: Transaction // si llega, el modal edita ese movimiento
 }
 
-const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
-  const [form, setForm]         = useState<FormState>(EMPTY)
+const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalProps) => {
+  const [form, setForm]         = useState<FormState>(() => (initial ? fromTransaction(initial) : EMPTY))
   const [saving, setSaving]     = useState(false)
   const [scanning, setScanning] = useState(false)
   const [err, setErr]           = useState("")
@@ -85,14 +95,15 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
       setErr("Descripción e importe son obligatorios."); return
     }
     setSaving(true)
-    const ok = await onAdd({
+    const time = initial?.date.split(" ")[1]
+    const ok = await onSave({
       description: form.description.trim(),
       amount: form.type === "expense"
         ? -Math.abs(parseFloat(form.amount))
         : Math.abs(parseFloat(form.amount)),
       category: form.type === "income" ? "Ingresos" : form.category,
       type: form.type,
-      date: form.date,
+      date: time ? `${form.date} ${time}` : form.date,
     })
     setSaving(false)
     if (ok) onClose()
@@ -103,14 +114,14 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
     <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div className="glass-panel border border-white/10 rounded-3xl p-6 sm:p-7 w-full max-w-sm my-auto max-h-[92vh] overflow-y-auto shadow-2xl">
         <div className="flex justify-between items-center mb-5">
-          <h3 className="text-base font-bold text-white">Nueva transacción</h3>
+          <h3 className="text-base font-bold text-white">{initial ? "Editar transacción" : "Nueva transacción"}</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 text-lg leading-none transition-colors">
             ×
           </button>
         </div>
 
-        {/* Botones de escanear (Cámara y Galería) */}
-        {form.type === "expense" && (
+        {/* Botones de escanear (Cámara y Galería), solo al crear */}
+        {!initial && form.type === "expense" && (
           <div className="mb-5 space-y-2">
             <input
               ref={cameraInputRef}
@@ -211,7 +222,7 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
                 onChange={(e) => set("category", e.target.value)}
                 className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-white transition-colors"
               >
-                {CATEGORIES.map((c) => (
+                {(CATEGORIES.includes(form.category) ? CATEGORIES : [...CATEGORIES, form.category]).map((c) => (
                   <option key={c} value={c} className="bg-slate-900 text-white">
                     {c}
                   </option>
@@ -228,7 +239,7 @@ const AddTransactionModal = ({ onClose, onAdd }: AddTransactionModalProps) => {
           disabled={saving || scanning}
           className="mt-6 w-full py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 transition-all shadow-md shadow-cyan-500/20 disabled:opacity-50"
         >
-          {saving ? "Guardando..." : "Añadir transacción"}
+          {saving ? "Guardando..." : initial ? "Guardar cambios" : "Añadir transacción"}
         </button>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import {
   collection, query, where,
-  onSnapshot, addDoc, deleteDoc, doc, serverTimestamp,
+  onSnapshot, addDoc, deleteDoc, updateDoc, doc, serverTimestamp,
 } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import type { Transaction, NewTransaction, Totals } from "../types"
@@ -75,6 +75,17 @@ export const useTransactions = (userId: string | undefined) => {
     } catch (e) {
       setError((e as Error).message)
       return 0
+    }
+  }
+
+  const updateTransaction = async (id: string, tx: NewTransaction): Promise<boolean> => {
+    try {
+      const { description, amount, category, type, date } = tx
+      await updateDoc(doc(db, "transactions", id), { description, amount, category, type, date })
+      return true
+    } catch (e) {
+      setError((e as Error).message)
+      return false
     }
   }
 
@@ -160,5 +171,5 @@ export const useTransactions = (userId: string | undefined) => {
       : "0.0",
   }
 
-  return { transactions, loading, error, addTransaction, addBatchTransactions, updateBatchTransactions, deleteTransaction, deleteAllTransactions, totals }
+  return { transactions, loading, error, addTransaction, addBatchTransactions, updateTransaction, updateBatchTransactions, deleteTransaction, deleteAllTransactions, totals }
 }

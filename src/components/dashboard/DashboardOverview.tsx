@@ -10,7 +10,7 @@ import TransactionDetailModal from "../transactions/TransactionDetailModal"
 import { fmt, fmtDec, buildMonthlyData, buildCategoryData } from "../../utils/formatters"
 import { MONTHS } from "../../constants/categories"
 import { filterTransactionsByMonth, computeTotals } from "../../utils/dateFilters"
-import type { Transaction, Totals } from "../../types"
+import type { NewTransaction, Transaction, Totals } from "../../types"
 
 const MODERN_COLORS = [
   "#06b6d4", "#38bdf8", "#818cf8", "#a78bfa", "#f472b6", "#fb7185", "#34d399", "#fbbf24",
@@ -22,6 +22,7 @@ interface DashboardOverviewProps {
   selectedMonth: string
   searchQuery: string
   onViewAllTransactions: () => void
+  onUpdate?: (id: string, tx: NewTransaction) => Promise<boolean>
 }
 
 export const DashboardOverview = ({
@@ -29,6 +30,7 @@ export const DashboardOverview = ({
   selectedMonth,
   searchQuery,
   onViewAllTransactions,
+  onUpdate,
 }: DashboardOverviewProps) => {
   // Transacciones filtradas por mes y por búsqueda si aplica
   const currentMonthTxs = useMemo(() => {
@@ -304,7 +306,7 @@ export const DashboardOverview = ({
       </div>
 
       {selectedTx && (
-        <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
+        <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} onUpdate={onUpdate} />
       )}
     </div>
   )

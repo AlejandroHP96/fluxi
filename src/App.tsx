@@ -18,6 +18,7 @@ const App = () => {
     transactions,
     addTransaction,
     addBatchTransactions,
+    updateTransaction,
     updateBatchTransactions,
     deleteTransaction,
     deleteAllTransactions,
@@ -112,6 +113,7 @@ const App = () => {
               selectedMonth={selectedMonth}
               searchQuery={searchQuery}
               onViewAllTransactions={() => setActiveTab("transactions")}
+              onUpdate={updateTransaction}
             />
           )}
 
@@ -121,6 +123,7 @@ const App = () => {
               searchQuery={searchQuery}
               onDelete={deleteTransaction}
               onDeleteAll={deleteAllTransactions}
+              onUpdate={updateTransaction}
             />
           )}
 
@@ -137,7 +140,7 @@ const App = () => {
       {showModal && (
         <AddTransactionModal
           onClose={() => setShowModal(false)}
-          onAdd={addTransaction}
+          onSave={addTransaction}
         />
       )}
 

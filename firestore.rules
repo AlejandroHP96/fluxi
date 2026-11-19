@@ -14,10 +14,10 @@ service cloud.firestore {
         && (request.resource.data.userId == request.auth.uid || (isAdmin() && isDemo(request.resource.data.userId)));
       allow delete: if request.auth != null
         && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)));
-      // Solo renombrar/recategorizar (desglose de Ventajón); el dueño no puede cambiar
+      // Editar los datos del movimiento; el dueño (userId) y createdAt no se pueden cambiar
       allow update: if request.auth != null
         && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'category']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'category', 'amount', 'type', 'date']);
     }
   }
 }

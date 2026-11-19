@@ -5,7 +5,7 @@ import TransactionDetailModal from "../components/transactions/TransactionDetail
 import { MonthSelector } from "../components/ui/MonthSelector"
 import { fmtDec } from "../utils/formatters"
 import { getAvailableMonths, filterTransactionsByMonth } from "../utils/dateFilters"
-import type { Transaction } from "../types"
+import type { NewTransaction, Transaction } from "../types"
 
 const FILTERS: Record<string, string> = {
   all: "Todos",
@@ -18,9 +18,10 @@ interface TransactionsProps {
   searchQuery?: string
   onDelete: (id: string) => Promise<boolean>
   onDeleteAll?: () => Promise<boolean>
+  onUpdate?: (id: string, tx: NewTransaction) => Promise<boolean>
 }
 
-const Transactions = ({ transactions, searchQuery = "", onDelete, onDeleteAll }: TransactionsProps) => {
+const Transactions = ({ transactions, searchQuery = "", onDelete, onDeleteAll, onUpdate }: TransactionsProps) => {
   const [deletingAll, setDeletingAll] = useState(false)
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const monthOptions = useMemo(() => getAvailableMonths(transactions), [transactions])
@@ -213,7 +214,7 @@ const Transactions = ({ transactions, searchQuery = "", onDelete, onDeleteAll }:
       </div>
 
       {selectedTx && (
-        <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
+        <TransactionDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} onUpdate={onUpdate} />
       )}
 
       {/* Elemento disparador de scroll infinito */}
