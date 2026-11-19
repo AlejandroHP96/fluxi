@@ -54,6 +54,9 @@ export const ImportStatementModal = ({
   const [pendingItems, setPendingItems] = useState<any[] | null>(null)
   const [pickedMonth, setPickedMonth] = useState("") // "YYYY-MM"
   const [ventajonSource, setVentajonSource] = useState<"pdf" | "sync">("pdf")
+  // Por qué no casa cada pago pendiente, agrupado (se muestra al final)
+  const [pendingReasons, setPendingReasons] = useState<Array<{ label: string; count: number; months: string[] }>>([])
+  const [itemsRange, setItemsRange] = useState<string>("")
 
   const existingVentajonCount = existingTransactions.filter((t) => isVentajon(t.description)).length
 
@@ -277,20 +280,19 @@ export const ImportStatementModal = ({
 
   // Empareja las compras de Ventajón (PDF o API) con los pagos "Ventajon" guardados y guarda el comercio real
   const matchAndSave = async (items: any[]) => {
-
     // existingTransactions llega por props desde el onSnapshot de App.tsx, que ya incluye
     // los movimientos recién importados (Firestore emite primero las escrituras locales).
     const ventajonTxs = existingTransactions.filter((t) => isVentajon(t.description))
 
     const usedItems = new Set<number>()
     const updates: Array<{ id: string; description: string; category: string }> = []
-    const unmatched: Array<{ date: string; amount: number }> = []
+    const unmatched: Transaction[] = []
 
     for (const tx of ventajonTxs) {
       const txAmt = Math.abs(Number(tx.amount))
       const txDay = parseTxDay(tx.date)
       if (!txDay) {
-        unmatched.push({ date: tx.date, amount: tx.amount })
+        unmatched.push(tx)
         continue
       }
 
@@ -316,14 +318,57 @@ export const ImportStatementModal = ({
           category: matchedItem.category,
         })
       } else {
-        unmatched.push({ date: tx.date, amount: tx.amount })
+        unmatched.push(tx)
       }
     }
+
+    // Motivo de cada pago sin pareja
+    const itemMonth = (it: any) => `${it.year}-${String(it.dateShort).split(".")[1]?.padStart(2, "0")}`
+    const itemMonths = new Set(items.map(itemMonth))
+    const reasons = new Map<string, Set<string>>()
+    const counts = new Map<string, number>()
+    for (const tx of unmatched) {
+      const txDay = parseTxDay(tx.date)
+      const month = txDay ? txDay.toISOString().slice(0, 7) : "?"
+      const txAmt = Math.abs(Number(tx.amount))
+      let label: string
+      if (!txDay) {
+        label = "Fecha que no se puede leer"
+      } else if (!itemMonths.has(month)) {
+        label = "Ventajón no tiene compras de ese mes"
+      } else if (Number(tx.amount) > 0) {
+        label = "Es un ingreso o devolución, no una compra"
+      } else {
+        let nearest = Infinity
+        items.forEach((it: any) => {
+          if (Math.abs(Number(it.amount) - txAmt) < 0.01) {
+            nearest = Math.min(nearest, dayDiffToShortDate(txDay, it.dateShort, it.year))
+          }
+        })
+        label =
+          nearest <= MAX_DAY_DIFF
+            ? "La compra ya se emparejó con otro pago igual (posible duplicado)"
+            : nearest <= 31
+              ? "Hay una compra con ese importe, pero a más de 3 días"
+              : "No hay ninguna compra en Ventajón con ese importe"
+      }
+      if (!reasons.has(label)) reasons.set(label, new Set())
+      reasons.get(label)!.add(month)
+      counts.set(label, (counts.get(label) || 0) + 1)
+    }
+    setPendingReasons(
+      [...reasons].map(([label, months]) => ({ label, count: counts.get(label) || 0, months: [...months].sort() }))
+        .sort((a, b) => b.count - a.count)
+    )
+    const sortedItemMonths = [...itemMonths].sort()
+    setItemsRange(
+      items.length ? `${items.length} compras de Ventajón (${sortedItemMonths[0]} → ${sortedItemMonths[sortedItemMonths.length - 1]})` : ""
+    )
 
     if (unmatched.length > 0) {
       console.warn(
         `[Ventajón] ${ventajonTxs.length} movimientos, ${updates.length} emparejados, ${unmatched.length} sin pareja`,
-        { unmatched: unmatched.slice(0, 10), items: items.slice(0, 10) }
+        { unmatched: unmatched.slice(0, 20).map((t) => ({ date: t.date, amount: t.amount })), items: items.slice(0, 10) }
       )
     }
 
@@ -688,6 +733,19 @@ export const ImportStatementModal = ({
                     ? `${pendingVentajonCount} pagos de Ventajon siguen sin comercio: no hay una compra en Ventajón con el mismo importe y fecha.`
                     : `${pendingVentajonCount} pagos de Ventajon siguen sin comercio: no aparecen en ese PDF. Sube el extracto del mes siguiente cuando lo tengas.`}
                 </p>
+              )}
+              {pendingVentajonCount > 0 && pendingReasons.length > 0 && (
+                <ul className="mt-3 max-w-xs mx-auto text-left space-y-1.5 text-[11px] text-white/50">
+                  {itemsRange && <li className="text-white/40">Recibidas: {itemsRange}</li>}
+                  {pendingReasons.map((r) => (
+                    <li key={r.label}>
+                      <span className="font-semibold text-white/80">{r.count}</span> · {r.label}
+                      <span className="text-white/30">
+                        {" "}({r.months.length > 3 ? `${r.months[0]} → ${r.months[r.months.length - 1]}, ${r.months.length} meses` : r.months.join(", ")})
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               )}
               {pendingVentajonCount > 0 && (
                 <button
