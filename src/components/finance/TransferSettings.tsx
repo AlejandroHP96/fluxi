@@ -62,8 +62,8 @@ export const TransferSettings = ({ transactions, finance }: TransferSettingsProp
             <h3 className="text-base font-bold text-white tracking-tight">Ajustes de traspasos</h3>
             <p className="text-xs text-white/40">
               {matches.length > 0
-                ? `${matches.length} transacciones parecen traspasos entre tus cuentas`
-                : "Qué transferencias son entre tus propias cuentas"}
+                ? `${matches.length} transacciones parecen traspasos entre tus cuentas o con la Conjunta`
+                : "Qué transferencias son entre tus cuentas o con la Conjunta"}
             </p>
           </div>
         </div>
@@ -73,13 +73,14 @@ export const TransferSettings = ({ transactions, finance }: TransferSettingsProp
       {open && (
         <div className="mt-5 space-y-5">
           <p className="text-xs text-white/50 leading-relaxed">
-            Las transferencias entre tus cuentas no son gasto ni ingreso: salen de Transacciones y se ven en
-            «Traspasos con tus otras cuentas». Indica aquí los nombres de tus otras cuentas tal y como aparecen en
-            el extracto (p. ej. «Transferencia de ALEJANDRO HERRERA PESTANA»).
+            Las transferencias entre tus cuentas, o con la persona con la que compartes la Conjunta, no son gasto ni
+            ingreso: salen de Transacciones y se ven en «Traspasos con tus cuentas y la Conjunta». Indica aquí los
+            nombres de tus otras cuentas y de esa persona tal y como aparecen en el extracto (p. ej.
+            «Transferencia de ALEJANDRO HERRERA PESTANA» o «PATRICIA SOLERA PEREZ»).
           </p>
 
           <div>
-            <label className="block text-[11px] font-medium text-white/50 mb-1.5">Nombres de titular</label>
+            <label className="block text-[11px] font-medium text-white/50 mb-1.5">Nombres de titulares (tuyos o de quien comparte la Conjunta)</label>
             {names.length > 0 && (
               <div className="flex flex-wrap gap-2 mb-3">
                 {names.map((n) => (

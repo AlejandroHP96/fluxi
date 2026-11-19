@@ -7,7 +7,7 @@ import type {
   Account, AccountKind, FinanceSettings, Goal, NewGoal, NewTransfer, Transaction, Transfer, TransferKind,
 } from "../types"
 
-const DEFAULT_SETTINGS: FinanceSettings = { budgets: {}, ownTransferNames: [] }
+const DEFAULT_SETTINGS: FinanceSettings = { budgets: {}, ownTransferNames: [], categoryRules: {} }
 const REVOLUT_NAMES: Record<Exclude<AccountKind, "manual">, string> = {
   revolut_current: "Conjunta",
   revolut_savings: "Ahorros",
@@ -141,6 +141,14 @@ export const useFinance = (userId: string | undefined) => {
     return saveSettings({ budgets })
   }
 
+  // Regla propia: los movimientos con este concepto (conceptKey) van a esta categoría; null = quitarla
+  const setCategoryRule = (key: string, category: string | null) => {
+    const categoryRules = { ...settings.categoryRules }
+    if (category) categoryRules[key] = category
+    else delete categoryRules[key]
+    return saveSettings({ categoryRules })
+  }
+
   const setOwnTransferNames = (names: string[]) =>
     saveSettings({ ownTransferNames: [...new Set(names.map((n) => n.trim()).filter(Boolean))] })
 
@@ -153,7 +161,7 @@ export const useFinance = (userId: string | undefined) => {
     accounts, transfers, goals, settings, loading, error,
     addManualAccount, updateAccount, deleteAccount, upsertRevolutBalance,
     addTransfers, moveTransactionsToTransfers,
-    setBudget, setOwnTransferNames,
+    setBudget, setOwnTransferNames, setCategoryRule,
     addGoal, updateGoal, deleteGoal,
   }
 }

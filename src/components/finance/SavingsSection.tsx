@@ -137,15 +137,15 @@ export const SavingsSection = ({ transfers }: { transfers: Transfer[] }) => {
         </>
       )}
 
-      {/* Traspasos con tus otras cuentas */}
+      {/* Traspasos con tus cuentas y la Conjunta */}
       <div className="mt-8 pt-6 border-t border-white/[0.08]">
         <SectionHeader
-          title="Traspasos con tus otras cuentas"
-          subtitle="Dinero que mueves entre tus propias cuentas: ni gasto ni ingreso."
+          title="Traspasos con tus cuentas y la Conjunta"
+          subtitle="Dinero que mueves entre tus cuentas o con quien comparte la Conjunta: ni gasto ni ingreso."
         />
         {ownMonths.length === 0 ? (
           <p className="text-xs text-white/40 py-4 text-center">
-            Sin traspasos todavía. Añade tus nombres en «Ajustes de traspasos» para detectarlos.
+            Sin traspasos todavía. Añade los nombres en «Ajustes de traspasos» para detectarlos.
           </p>
         ) : (
           <>

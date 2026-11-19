@@ -31,7 +31,8 @@ const fromTransaction = (tx: Transaction): FormState => ({
 
 interface AddTransactionModalProps {
   onClose: () => void
-  onSave: (tx: NewTransaction) => Promise<boolean>
+  // applyToAll: al editar, aplicar la categoría a todos los movimientos con el mismo concepto y recordarla
+  onSave: (tx: NewTransaction, applyToAll?: boolean) => Promise<boolean>
   initial?: Transaction // si llega, el modal edita ese movimiento
 }
 
@@ -40,6 +41,7 @@ const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalPr
   const [saving, setSaving]     = useState(false)
   const [scanning, setScanning] = useState(false)
   const [err, setErr]           = useState("")
+  const [applyToAll, setApplyToAll] = useState(false)
 
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -90,6 +92,9 @@ const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalPr
     }
   }
 
+  // Solo al editar un gasto y cambiarle la categoría
+  const canApplyToAll = Boolean(initial) && form.type === "expense" && form.category !== initial?.category
+
   const handleSubmit = async () => {
     if (!form.description.trim() || !form.amount) {
       setErr("Descripción e importe son obligatorios."); return
@@ -103,7 +108,7 @@ const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalPr
       category: form.type === "income" ? "Ingresos" : form.category,
       type: form.type,
       date: initial ? initial.date : form.date,
-    })
+    }, canApplyToAll && applyToAll)
     setSaving(false)
     if (ok) onClose()
     else setErr("Error al guardar. Inténtalo de nuevo.")
@@ -232,6 +237,20 @@ const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalPr
             </div>
           )}
         </div>
+
+        {canApplyToAll && (
+          <label className="flex items-start gap-2 mt-4 text-[11px] text-white/60 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={applyToAll}
+              onChange={(e) => setApplyToAll(e.target.checked)}
+              className="mt-0.5 accent-cyan-500"
+            />
+            <span>
+              Poner «{form.category}» en todos los movimientos «{initial?.description}» y recordarlo para las próximas importaciones
+            </span>
+          </label>
+        )}
 
         {err && <p className="text-rose-400 text-xs mt-3">{err}</p>}
 

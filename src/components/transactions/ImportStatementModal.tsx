@@ -3,6 +3,7 @@ import { FileSpreadsheet, FileText, Loader2, Upload, Check, AlertCircle, Sparkle
 import { auth } from "../../lib/firebase"
 import { parseRevolutStatement, type RevolutStatement } from "../../utils/statementParser"
 import { filterNew, isOwnTransfer, ownTransferKind } from "../../utils/finance"
+import { categorize } from "../../utils/categorize"
 import type { FinanceApi } from "../../hooks/useFinance"
 import type { Transaction, NewTransaction, NewTransfer } from "../../types"
 
@@ -96,7 +97,7 @@ export const ImportStatementModal = ({
       if (isCsv) {
         const text = await file.text()
         const names = finance?.settings.ownTransferNames ?? []
-        const parsed = parseRevolutStatement(text, names)
+        const parsed = parseRevolutStatement(text, names, finance?.settings.categoryRules ?? {})
         if (parsed.transactions.length === 0 && parsed.transfers.length === 0) {
           throw new Error("No se encontraron transacciones válidas en el archivo CSV")
         }
@@ -364,7 +365,10 @@ export const ImportStatementModal = ({
         updates.push({
           id: tx.id,
           description: matchedItem.concept,
-          category: matchedItem.category,
+          // Mismo categorizador que las transacciones (incluye tus reglas); el de la API, de respaldo
+          category: ((c) => (c !== "Otro" ? c : matchedItem.category || c))(
+            categorize(matchedItem.concept, false, finance?.settings.categoryRules ?? {})
+          ),
         })
       } else {
         unmatched.push(tx)

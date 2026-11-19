@@ -87,5 +87,6 @@ export type NewGoal = Omit<Goal, "id" | "userId">
 // Documento finance/{uid}
 export interface FinanceSettings {
   budgets: Record<string, number> // categoría -> límite mensual en €
-  ownTransferNames: string[] // titulares de tus otras cuentas ("ALEJANDRO HERRERA PESTANA")
+  ownTransferNames: string[] // titulares cuyas transferencias son traspasos ("ALEJANDRO HERRERA PESTANA")
+  categoryRules: Record<string, string> // conceptKey(descripción) -> categoría (ver src/utils/categorize.ts)
 }

@@ -12,6 +12,8 @@ import AuthPage from "./pages/AuthPage"
 import AddTransactionModal from "./components/transactions/AddTransactionModal"
 import { ImportStatementModal } from "./components/transactions/ImportStatementModal"
 import { getAvailableMonths } from "./utils/dateFilters"
+import { conceptKey } from "./utils/categorize"
+import type { NewTransaction } from "./types"
 import { LayoutDashboard, ReceiptText, BarChart3, Wallet } from "lucide-react"
 
 const App = () => {
@@ -27,6 +29,23 @@ const App = () => {
     totals,
   } = useTransactions(user?.uid)
   const finance = useFinance(user?.uid)
+
+  // Editar un movimiento; con applyToAll, la nueva categoría pasa a todos los del mismo concepto
+  // (según la descripción original del banco) y queda como regla para próximas importaciones
+  const handleUpdateTransaction = async (id: string, tx: NewTransaction, applyToAll = false) => {
+    const original = transactions.find((t) => t.id === id)
+    const ok = await updateTransaction(id, tx)
+    if (!ok || !applyToAll || !original) return ok
+    const key = conceptKey(original.description)
+    const others = transactions.filter(
+      (t) => t.id !== id && t.type === "expense" && conceptKey(t.description) === key && t.category !== tx.category
+    )
+    if (others.length > 0) {
+      await updateBatchTransactions(others.map((t) => ({ id: t.id, description: t.description, category: tx.category })))
+    }
+    await finance.setCategoryRule(key, tx.category)
+    return true
+  }
 
   const [activeTab, setActiveTab] = useState("overview")
   const [showModal, setShowModal] = useState(false)
@@ -117,7 +136,9 @@ const App = () => {
               selectedMonth={selectedMonth}
               searchQuery={searchQuery}
               onViewAllTransactions={() => setActiveTab("transactions")}
-              onUpdate={updateTransaction}
+              onUpdate={handleUpdateTransaction}
+              finance={finance}
+              onOpenFinance={() => setActiveTab("finance")}
             />
           )}
 
@@ -127,7 +148,7 @@ const App = () => {
               searchQuery={searchQuery}
               onDelete={deleteTransaction}
               onDeleteAll={deleteAllTransactions}
-              onUpdate={updateTransaction}
+              onUpdate={handleUpdateTransaction}
             />
           )}
 
@@ -143,6 +164,7 @@ const App = () => {
               transactions={transactions}
               finance={finance}
               onImport={() => setShowImportModal(true)}
+              onUpdateBatch={updateBatchTransactions}
             />
           )}
         </main>

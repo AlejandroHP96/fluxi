@@ -10,6 +10,8 @@ import TransactionDetailModal from "../transactions/TransactionDetailModal"
 import { fmt, fmtDec, buildMonthlyData, buildCategoryData } from "../../utils/formatters"
 import { MONTHS } from "../../constants/categories"
 import { filterTransactionsByMonth, computeTotals } from "../../utils/dateFilters"
+import { summarizeTransfersByMonth } from "../../utils/finance"
+import type { FinanceApi } from "../../hooks/useFinance"
 import type { NewTransaction, Transaction, Totals } from "../../types"
 
 const MODERN_COLORS = [
@@ -22,7 +24,9 @@ interface DashboardOverviewProps {
   selectedMonth: string
   searchQuery: string
   onViewAllTransactions: () => void
-  onUpdate?: (id: string, tx: NewTransaction) => Promise<boolean>
+  onUpdate?: (id: string, tx: NewTransaction, applyToAll?: boolean) => Promise<boolean>
+  finance: FinanceApi
+  onOpenFinance: () => void
 }
 
 export const DashboardOverview = ({
@@ -31,6 +35,8 @@ export const DashboardOverview = ({
   searchQuery,
   onViewAllTransactions,
   onUpdate,
+  finance,
+  onOpenFinance,
 }: DashboardOverviewProps) => {
   // Transacciones filtradas por mes y por búsqueda si aplica
   const currentMonthTxs = useMemo(() => {
@@ -63,6 +69,19 @@ export const DashboardOverview = ({
   }, [currentMonthTxs])
 
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
+
+  const wealth = useMemo(
+    () => finance.accounts.reduce((s, a) => s + Number(a.balance), 0),
+    [finance.accounts]
+  )
+  // Ahorro del mes actual (no depende del mes seleccionado arriba)
+  const now = new Date()
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+  const monthLabel = `${MONTHS[now.getMonth()]} ${now.getFullYear()}`
+  const savingsMonth = useMemo(() => {
+    const m = summarizeTransfersByMonth(finance.transfers).find((x) => x.month === currentMonthKey)
+    return { in: m?.savingsIn ?? 0, out: m?.savingsOut ?? 0, interest: m?.interest ?? 0 }
+  }, [finance.transfers, currentMonthKey])
 
   const kpis = [
     {
@@ -216,6 +235,80 @@ export const DashboardOverview = ({
             </>
           )}
         </div>
+      </div>
+
+      {/* Resumen de Finanzas: patrimonio, cuentas y ahorro del mes */}
+      <div className="glass-card rounded-2xl p-5 sm:p-6">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="text-base font-bold text-white tracking-tight">Finanzas</h3>
+            <p className="text-xs text-white/40">Patrimonio y ahorro del mes</p>
+          </div>
+          <button
+            onClick={onOpenFinance}
+            className="flex items-center gap-1 text-xs font-semibold text-cyan-400 hover:text-cyan-300 transition-colors"
+          >
+            <span>Ver Finanzas</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {finance.loading ? (
+          <p className="text-white/40 text-xs py-6 text-center">Cargando tus finanzas...</p>
+        ) : finance.accounts.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] px-5 py-6 text-center">
+            <p className="text-xs text-white/50">
+              Aún no hay cuentas. Importa el CSV de Revolut o añade una cuenta en Finanzas.
+            </p>
+            <button
+              onClick={onOpenFinance}
+              className="mt-3 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 transition-all"
+            >
+              Ir a Finanzas
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+            <div className="lg:col-span-2">
+              <p className="text-[11px] text-white/40 uppercase tracking-wider font-semibold">Patrimonio total</p>
+              <p className="text-3xl font-bold tracking-tight text-white font-mono mb-4">{fmtDec(wealth)}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {finance.accounts.map((a) => (
+                  <div
+                    key={a.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-2.5"
+                  >
+                    <span className="text-xs text-white/70 truncate">{a.name}</span>
+                    <span className={`text-xs font-mono font-semibold shrink-0 ${a.balance < 0 ? "text-rose-400" : "text-white"}`}>
+                      {fmtDec(a.balance)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="lg:col-span-1 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <PiggyBank className="w-4 h-4 text-emerald-400" />
+                <p className="text-xs font-semibold text-white">Ahorro de {monthLabel}</p>
+              </div>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-white/50">Aportado</span>
+                  <span className="font-mono text-white">{fmtDec(savingsMonth.in)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/50">Retirado</span>
+                  <span className="font-mono text-white">{fmtDec(savingsMonth.out)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/50">Intereses</span>
+                  <span className="font-mono text-emerald-400">{fmtDec(savingsMonth.interest)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. Bento Grid - Fila 3: Movimientos Recientes (Cards en móvil, tabla en Desktop) */}

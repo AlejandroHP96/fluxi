@@ -1,44 +1,13 @@
 import Papa from "papaparse"
 import type { NewTransaction, NewTransfer } from "../types"
 import { isOwnTransfer, ownTransferKind } from "./finance"
+import { categorize } from "./categorize"
 
 /**
- * Deduce automáticamente una categoría en base a palabras clave comunes
+ * Deduce la categoría (reglas de serie de src/utils/categorize.ts y, si se pasan, las tuyas)
  */
-export function guessCategory(description: string, isIncome: boolean): string {
-  if (isIncome) return "Ingresos"
-
-  const desc = description.toLowerCase()
-
-  if (/mercadona|carrefour|lidl|dia|aldi|eroski|alcampo|supermercado|fruteria|panaderia|consum|hipercor/i.test(desc)) {
-    return "Alimentación"
-  }
-  if (/uber|cabify|bolt|metro|renfe|repsol|cepsa|bp|gasolinera|peaje|autobus|alvia|parking|emt/i.test(desc)) {
-    return "Transporte"
-  }
-  if (/netflix|spotify|disney|apple|google|amazon prime|hbo|youtube|dazn|icloud/i.test(desc)) {
-    return "Suscripciones"
-  }
-  if (/bar|restaurante|cafe|burger|mcdonald|kfc|pizza|telepizza|glovo|just eat|starbucks|tapas|cerveceria/i.test(desc)) {
-    return "Ocio"
-  }
-  if (/cine|teatro|concierto|steam|playstation|nintendo|game|entradas/i.test(desc)) {
-    return "Ocio"
-  }
-  if (/farmacia|clinica|hospital|dentista|optica|sanitas|asisa|medico/i.test(desc)) {
-    return "Salud"
-  }
-  if (/alquiler|hipoteca|comunidad|hogar|ikea|leroy|bricomart/i.test(desc)) {
-    return "Vivienda"
-  }
-  if (/luz|agua|gas|endesa|iberdrola|naturgy|vodafone|movistar|orange|digi|yoigo/i.test(desc)) {
-    return "Suministros"
-  }
-  if (/zara|stradivarius|pull|bershka|mango|amazon|corte ingles|shein|aliexpress|primark/i.test(desc)) {
-    return "Compras"
-  }
-
-  return "Otro"
+export function guessCategory(description: string, isIncome: boolean, userRules: Record<string, string> = {}): string {
+  return categorize(description, isIncome, userRules)
 }
 
 /**
@@ -100,7 +69,11 @@ export interface RevolutStatement {
  *   en las filas de Ahorros); las transferencias con tus otras cuentas (ownNames) -> transfers;
  *   el resto -> transactions.
  */
-export function parseRevolutStatement(csvText: string, ownNames: string[] = []): RevolutStatement {
+export function parseRevolutStatement(
+  csvText: string,
+  ownNames: string[] = [],
+  categoryRules: Record<string, string> = {}
+): RevolutStatement {
   const result = Papa.parse(csvText, {
     header: true,
     skipEmptyLines: true,
@@ -168,7 +141,7 @@ export function parseRevolutStatement(csvText: string, ownNames: string[] = []):
 
     const isIncome = cleanAmount > 0
     const type = isIncome ? "income" : "expense"
-    const category = guessCategory(rawDesc, isIncome)
+    const category = guessCategory(rawDesc, isIncome, categoryRules)
 
     out.transactions.push({
       description: rawDesc.trim() || (isIncome ? "Ingreso" : "Gasto"),

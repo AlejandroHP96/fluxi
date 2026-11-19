@@ -3,12 +3,16 @@
 
 export function cleanVentajonConcept(raw: string): string {
   let s = raw.trim()
+  // Ventajón manda la "Ñ" rota ("CA\uFFF1ON COSMO STORE", "CA\uFFA5ON"): se repone
+  s = s.replace(/[\uFF00-\uFFFF]/g, "Ñ")
+  // Prefijo del datáfono ("BK30788 TACO PORSCHE TACO")
+  s = s.replace(/^BK\d+\s+/i, "")
   s = s.replace(/\s+(ES|NL|FR|DE)$/i, "")
   s = s.replace(/\s+PINPAD\b/i, "")
   // Sin \b final: el PDF pega el país a la localidad ("SANTA CRUZ DEES", "SAN CRISTOBALES")
   s = s.replace(/\b(SANTA CRUZ DE|SANATA CRUZ|SAN CRISTOBAL|LA LAGUNA|SAN CRISTOBLA).*/i, "").trim()
   s = s.replace(/FINCA ESPA#?A/i, "Finca España")
-  s = s.replace(/RTE\b/i, "Restaurante")
+  s = s.replace(/\bRTE\b/i, "Restaurante")
 
   if (/MERCADONA/i.test(s)) {
     s = s.replace(/TENERIFE.*/i, "").trim()

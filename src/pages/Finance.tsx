@@ -2,6 +2,7 @@ import { AccountsSection } from "../components/finance/AccountsSection"
 import { SavingsSection } from "../components/finance/SavingsSection"
 import { BudgetsSection } from "../components/finance/BudgetsSection"
 import { GoalsSection } from "../components/finance/GoalsSection"
+import { CategoriesSection } from "../components/finance/CategoriesSection"
 import { TransferSettings } from "../components/finance/TransferSettings"
 import type { FinanceApi } from "../hooks/useFinance"
 import type { Transaction } from "../types"
@@ -10,9 +11,10 @@ interface FinanceProps {
   transactions: Transaction[]
   finance: FinanceApi
   onImport?: () => void
+  onUpdateBatch: (updates: Array<{ id: string; description: string; category: string }>) => Promise<number>
 }
 
-const Finance = ({ transactions, finance, onImport }: FinanceProps) => {
+const Finance = ({ transactions, finance, onImport, onUpdateBatch }: FinanceProps) => {
   if (finance.loading) {
     return <p className="text-white/40 text-xs py-20 text-center">Cargando tus finanzas...</p>
   }
@@ -28,6 +30,7 @@ const Finance = ({ transactions, finance, onImport }: FinanceProps) => {
       <SavingsSection transfers={finance.transfers} />
       <BudgetsSection transactions={transactions} finance={finance} />
       <GoalsSection finance={finance} />
+      <CategoriesSection transactions={transactions} finance={finance} onUpdateBatch={onUpdateBatch} />
       <TransferSettings transactions={transactions} finance={finance} />
     </div>
   )

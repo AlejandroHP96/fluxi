@@ -18,7 +18,7 @@ interface TransactionsProps {
   searchQuery?: string
   onDelete: (id: string) => Promise<boolean>
   onDeleteAll?: () => Promise<boolean>
-  onUpdate?: (id: string, tx: NewTransaction) => Promise<boolean>
+  onUpdate?: (id: string, tx: NewTransaction, applyToAll?: boolean) => Promise<boolean>
 }
 
 const Transactions = ({ transactions, searchQuery = "", onDelete, onDeleteAll, onUpdate }: TransactionsProps) => {

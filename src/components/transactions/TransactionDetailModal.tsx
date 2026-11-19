@@ -8,7 +8,7 @@ import type { NewTransaction, Transaction } from "../../types"
 interface TransactionDetailModalProps {
   tx: Transaction
   onClose: () => void
-  onUpdate?: (id: string, tx: NewTransaction) => Promise<boolean>
+  onUpdate?: (id: string, tx: NewTransaction, applyToAll?: boolean) => Promise<boolean>
 }
 
 const TransactionDetailModal = ({ tx, onClose, onUpdate }: TransactionDetailModalProps) => {
@@ -21,8 +21,8 @@ const TransactionDetailModal = ({ tx, onClose, onUpdate }: TransactionDetailModa
       <AddTransactionModal
         initial={tx}
         onClose={() => setEditing(false)}
-        onSave={async (data) => {
-          const ok = await onUpdate(tx.id, data)
+        onSave={async (data, applyToAll) => {
+          const ok = await onUpdate(tx.id, data, applyToAll)
           if (ok) onClose()
           return ok
         }}
