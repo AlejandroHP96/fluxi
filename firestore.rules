@@ -1,50 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAdmin() {
-      return request.auth != null && request.auth.token.email == 'alejandroherrepes@gmail.com';
-    }
-    function isDemo(uid) {
-      return uid == 'jTQDmVrbmDSX657q7Of8E0O0EfK2';
-    }
-    match /transactions/{id} {
-      allow read: if request.auth != null
-        && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)));
-      allow create: if request.auth != null
-        && (request.resource.data.userId == request.auth.uid || (isAdmin() && isDemo(request.resource.data.userId)));
-      allow delete: if request.auth != null
-        && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)));
-      // Editar descripción, categoría y tipo. Fecha, dueño y createdAt no cambian; el importe
-      // solo puede cambiar de signo (al pasar de gasto a ingreso o al revés)
-      allow update: if request.auth != null
-        && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'category', 'type', 'amount'])
-        && (request.resource.data.amount == resource.data.amount
-          || math.abs(request.resource.data.amount) == math.abs(resource.data.amount));
-    }
-
-    // Finanzas: cada documento es solo de su dueño y el dueño no se puede cambiar
+    // Cada documento es solo de su dueño y el dueño no se puede cambiar
     function owns(data) {
       return request.auth != null && data.userId == request.auth.uid;
     }
-    match /accounts/{id} {
+
+    // Gastos apuntados a mano o importados del CSV de Revolut
+    match /expenses/{id} {
       allow read, delete: if owns(resource.data);
-      allow create: if owns(request.resource.data);
-      allow update: if owns(resource.data) && owns(request.resource.data);
+      allow create: if owns(request.resource.data)
+        && request.resource.data.amount is number && request.resource.data.amount > 0
+        && request.resource.data.date is string && request.resource.data.concept is string;
+      allow update: if owns(resource.data) && owns(request.resource.data)
+        && request.resource.data.amount is number && request.resource.data.amount > 0;
     }
-    match /transfers/{id} {
-      allow read, delete: if owns(resource.data);
-      allow create: if owns(request.resource.data);
-      allow update: if owns(resource.data) && owns(request.resource.data);
-    }
-    match /goals/{id} {
-      allow read, delete: if owns(resource.data);
-      allow create: if owns(request.resource.data);
-      allow update: if owns(resource.data) && owns(request.resource.data);
-    }
-    // Presupuestos y nombres de traspaso: finance/{uid}
-    match /finance/{uid} {
+
+    // Presupuesto mensual (history) y categorías recordadas al importar (memory)
+    match /budgets/{uid} {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // El resto (colecciones de la versión anterior: transactions, transfers, accounts, goals, finance)
+    // queda cerrado por defecto
   }
 }

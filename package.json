@@ -9,21 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^3.6.0",
     "firebase": "^10.7.0",
-    "framer-motion": "^14.14.0",
     "lucide-react": "^1.75.0",
     "papaparse": "^5.7.1",
-    "pdf-parse": "^1.1.1",
-    "pdf2json": "^4.1.1",
-    "pdfjs-dist": "^6.5.438",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "recharts": "^2.10.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/papaparse": "^5.5.2",
-    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^4.2.0",

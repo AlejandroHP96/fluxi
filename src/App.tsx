@@ -1,62 +1,12 @@
-import { useState, useMemo } from "react"
 import { useAuth } from "./hooks/useAuth"
-import { useTransactions } from "./hooks/useTransactions"
-import { useFinance } from "./hooks/useFinance"
-import { Sidebar } from "./components/layout/Sidebar"
-import { Topbar } from "./components/layout/Topbar"
-import { DashboardOverview } from "./components/dashboard/DashboardOverview"
-import Transactions from "./pages/Transactions"
-import Analytics from "./pages/Analytics"
-import Finance from "./pages/Finance"
+import { useBudget } from "./hooks/useBudget"
 import AuthPage from "./pages/AuthPage"
-import AddTransactionModal from "./components/transactions/AddTransactionModal"
-import { ImportStatementModal } from "./components/transactions/ImportStatementModal"
+import MonthDashboard from "./pages/MonthDashboard"
 import { ZkLoader } from "./components/brand/ZkLoader"
-import { getAvailableMonths } from "./utils/dateFilters"
-import { conceptKey } from "./utils/categorize"
-import type { NewTransaction } from "./types"
-import { LayoutDashboard, ReceiptText, BarChart3, Wallet } from "lucide-react"
 
 const App = () => {
-  const { user, photoUrl, updateAvatar, loading: authLoading, signIn, signUp, signOut } = useAuth()
-  const {
-    transactions,
-    addTransaction,
-    addBatchTransactions,
-    updateTransaction,
-    updateBatchTransactions,
-    deleteTransaction,
-    deleteAllTransactions,
-    totals,
-  } = useTransactions(user?.uid)
-  const finance = useFinance(user?.uid)
-
-  // Editar un movimiento; con applyToAll, la nueva categoría pasa a todos los del mismo concepto
-  // (según la descripción original del banco) y queda como regla para próximas importaciones
-  const handleUpdateTransaction = async (id: string, tx: NewTransaction, applyToAll = false) => {
-    const original = transactions.find((t) => t.id === id)
-    const ok = await updateTransaction(id, tx)
-    if (!ok || !applyToAll || !original) return ok
-    const key = conceptKey(original.description)
-    const others = transactions.filter(
-      (t) => t.id !== id && t.type === "expense" && conceptKey(t.description) === key && t.category !== tx.category
-    )
-    if (others.length > 0) {
-      await updateBatchTransactions(others.map((t) => ({ id: t.id, description: t.description, category: tx.category })))
-    }
-    await finance.setCategoryRule(key, tx.category)
-    return true
-  }
-
-  const [activeTab, setActiveTab] = useState("overview")
-  const [showModal, setShowModal] = useState(false)
-  const [showImportModal, setShowImportModal] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
-
-  const monthOptions = useMemo(() => getAvailableMonths(transactions), [transactions])
-  const [selectedMonth, setSelectedMonth] = useState<string>(() => {
-    return monthOptions[0]?.key || "all"
-  })
+  const { user, loading: authLoading, signIn, signUp, signOut } = useAuth()
+  const budget = useBudget(user?.uid)
 
   // El loader ZK es siempre el elemento raíz: así no se reinicia al pasar de "cargando" a la app o al login
   if (authLoading || !user) {
@@ -65,121 +15,7 @@ const App = () => {
 
   return (
     <ZkLoader>
-      <div className="flex min-h-screen bg-[#07090e] text-white">
-        {/* 1. Sidebar Fija Lateral (Desktop) como en el video */}
-        <Sidebar
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onAdd={() => setShowModal(true)}
-          onImport={() => setShowImportModal(true)}
-          onSignOut={signOut}
-          userEmail={user.email}
-          photoUrl={photoUrl}
-          onUpdateAvatar={updateAvatar}
-          txCount={transactions.length}
-        />
-
-        {/* 2. Área de Contenido Principal */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Topbar con buscador ⌘K y selector de mes */}
-          <Topbar
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            selectedMonth={selectedMonth}
-            onMonthChange={setSelectedMonth}
-            monthOptions={monthOptions}
-            onAdd={() => setShowModal(true)}
-            onImport={() => setShowImportModal(true)}
-          />
-
-          {/* Barra de pestañas móvil en parte superior */}
-          <div className="lg:hidden flex items-center justify-around border-b border-white/5 bg-white/[0.02] px-2 py-2">
-            {[
-              { id: "overview", label: "Dashboard", icon: LayoutDashboard },
-              { id: "transactions", label: "Transacciones", icon: ReceiptText },
-              { id: "analytics", label: "Analítica", icon: BarChart3 },
-              { id: "finance", label: "Finanzas", icon: Wallet },
-            ].map((tab) => {
-              const Icon = tab.icon
-              const isActive = activeTab === tab.id
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
-                    isActive
-                      ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30"
-                      : "text-white/40 hover:text-white"
-                  }`}
-                >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Contenedor del contenido */}
-          <main className="flex-1 p-4 sm:p-7 max-w-7xl w-full mx-auto overflow-y-auto">
-            {activeTab === "overview" && (
-              <DashboardOverview
-                transactions={transactions}
-                totals={totals}
-                selectedMonth={selectedMonth}
-                searchQuery={searchQuery}
-                onViewAllTransactions={() => setActiveTab("transactions")}
-                onUpdate={handleUpdateTransaction}
-                finance={finance}
-                onOpenFinance={() => setActiveTab("finance")}
-              />
-            )}
-
-            {activeTab === "transactions" && (
-              <Transactions
-                transactions={transactions}
-                searchQuery={searchQuery}
-                onDelete={deleteTransaction}
-                onDeleteAll={deleteAllTransactions}
-                onUpdate={handleUpdateTransaction}
-              />
-            )}
-
-            {activeTab === "analytics" && (
-              <Analytics
-                transactions={transactions}
-                totals={totals}
-              />
-            )}
-
-            {activeTab === "finance" && (
-              <Finance
-                transactions={transactions}
-                finance={finance}
-                onImport={() => setShowImportModal(true)}
-                onUpdateBatch={updateBatchTransactions}
-              />
-            )}
-          </main>
-        </div>
-
-        {/* Modales */}
-        {showModal && (
-          <AddTransactionModal
-            onClose={() => setShowModal(false)}
-            onSave={addTransaction}
-          />
-        )}
-
-        {showImportModal && (
-          <ImportStatementModal
-            onClose={() => setShowImportModal(false)}
-            onImport={addBatchTransactions}
-            onUpdateBatch={updateBatchTransactions}
-            existingTransactions={transactions}
-            finance={finance}
-          />
-        )}
-      </div>
+      <MonthDashboard email={user.email} onSignOut={signOut} budget={budget} />
     </ZkLoader>
   )
 }

@@ -1,5 +1,3 @@
-import type { Transaction } from "../types"
-
 // Clave de concepto: mayúsculas, sin tildes ni signos y sin números sueltos.
 // "To Veronica Concepción Perez" y "To Veronica Concepcion Perez" dan la misma clave.
 // Los caracteres rotos de Ventajón ("Ca￱on") quedan como espacio: "CA ON COSMO STORE".
@@ -38,18 +36,4 @@ export function categorize(description: string, isIncome: boolean, userRules: Re
   if (userRules[key]) return userRules[key]
   for (const [re, category] of RULES) if (re.test(key)) return category
   return "Otro"
-}
-
-// Gastos que están en "Otro" y que ahora tienen categoría (con las reglas actuales y las tuyas)
-export function recategorizeOther(
-  transactions: Transaction[],
-  userRules: Record<string, string> = {}
-): Array<{ id: string; description: string; category: string }> {
-  const out: Array<{ id: string; description: string; category: string }> = []
-  for (const t of transactions) {
-    if (t.type !== "expense" || t.category !== "Otro") continue
-    const category = categorize(t.description, false, userRules)
-    if (category !== "Otro") out.push({ id: t.id, description: t.description, category })
-  }
-  return out
 }
