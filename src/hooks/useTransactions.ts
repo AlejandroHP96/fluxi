@@ -78,10 +78,11 @@ export const useTransactions = (userId: string | undefined) => {
     }
   }
 
+  // La fecha no se guarda al editar; el importe solo puede cambiar de signo (gasto <-> ingreso)
   const updateTransaction = async (id: string, tx: NewTransaction): Promise<boolean> => {
     try {
-      const { description, amount, category, type, date } = tx
-      await updateDoc(doc(db, "transactions", id), { description, amount, category, type, date })
+      const { description, amount, category, type } = tx
+      await updateDoc(doc(db, "transactions", id), { description, amount, category, type })
       return true
     } catch (e) {
       setError((e as Error).message)

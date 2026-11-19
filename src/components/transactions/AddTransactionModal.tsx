@@ -20,7 +20,7 @@ const EMPTY: FormState = {
   date: new Date().toISOString().split("T")[0],
 }
 
-// Edición: el formulario solo maneja el día; la hora original ("YYYY-MM-DD HH:mm") se conserva al guardar
+// Edición: fecha, hora e importe se muestran pero no se pueden cambiar
 const fromTransaction = (tx: Transaction): FormState => ({
   description: tx.description,
   amount: String(Math.abs(Number(tx.amount))),
@@ -95,15 +95,14 @@ const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalPr
       setErr("Descripción e importe son obligatorios."); return
     }
     setSaving(true)
-    const time = initial?.date.split(" ")[1]
+    // Al editar, el importe es el original (solo cambia el signo si cambia el tipo) y la fecha no se toca
+    const amount = initial ? Math.abs(Number(initial.amount)) : Math.abs(parseFloat(form.amount))
     const ok = await onSave({
       description: form.description.trim(),
-      amount: form.type === "expense"
-        ? -Math.abs(parseFloat(form.amount))
-        : Math.abs(parseFloat(form.amount)),
+      amount: form.type === "expense" ? -amount : amount,
       category: form.type === "income" ? "Ingresos" : form.category,
       type: form.type,
-      date: time ? `${form.date} ${time}` : form.date,
+      date: initial ? initial.date : form.date,
     })
     setSaving(false)
     if (ok) onClose()
@@ -200,7 +199,8 @@ const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalPr
               placeholder="0.00"
               value={form.amount}
               onChange={(e) => set("amount", e.target.value)}
-              className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/20 transition-colors"
+              disabled={!!initial}
+              className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-white/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 
@@ -210,7 +210,8 @@ const AddTransactionModal = ({ onClose, onSave, initial }: AddTransactionModalPr
               type="date"
               value={form.date}
               onChange={(e) => set("date", e.target.value)}
-              className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-white transition-colors"
+              disabled={!!initial}
+              className="w-full glass-input rounded-xl px-3.5 py-2.5 text-xs text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
 

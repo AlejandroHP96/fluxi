@@ -14,10 +14,13 @@ service cloud.firestore {
         && (request.resource.data.userId == request.auth.uid || (isAdmin() && isDemo(request.resource.data.userId)));
       allow delete: if request.auth != null
         && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)));
-      // Editar los datos del movimiento; el dueño (userId) y createdAt no se pueden cambiar
+      // Editar descripción, categoría y tipo. Fecha, dueño y createdAt no cambian; el importe
+      // solo puede cambiar de signo (al pasar de gasto a ingreso o al revés)
       allow update: if request.auth != null
         && (resource.data.userId == request.auth.uid || (isAdmin() && isDemo(resource.data.userId)))
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'category', 'amount', 'type', 'date']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'category', 'type', 'amount'])
+        && (request.resource.data.amount == resource.data.amount
+          || math.abs(request.resource.data.amount) == math.abs(resource.data.amount));
     }
   }
 }
