@@ -118,6 +118,7 @@ const App = () => {
           {activeTab === "transactions" && (
             <Transactions
               transactions={transactions}
+              searchQuery={searchQuery}
               onDelete={deleteTransaction}
               onDeleteAll={deleteAllTransactions}
             />

@@ -15,11 +15,12 @@ const FILTERS: Record<string, string> = {
 
 interface TransactionsProps {
   transactions: Transaction[]
+  searchQuery?: string
   onDelete: (id: string) => Promise<boolean>
   onDeleteAll?: () => Promise<boolean>
 }
 
-const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps) => {
+const Transactions = ({ transactions, searchQuery = "", onDelete, onDeleteAll }: TransactionsProps) => {
   const [deletingAll, setDeletingAll] = useState(false)
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null)
   const monthOptions = useMemo(() => getAvailableMonths(transactions), [transactions])
@@ -36,15 +37,22 @@ const Transactions = ({ transactions, onDelete, onDeleteAll }: TransactionsProps
   // Reiniciar el contador visible al cambiar de mes o filtro
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
-  }, [selectedMonth, typeFilter])
+  }, [selectedMonth, typeFilter, searchQuery])
 
   const filtered = useMemo(() => {
-    let result = filterTransactionsByMonth(transactions, selectedMonth)
+    // Con búsqueda activa se busca en todos los meses, no solo en el seleccionado
+    const q = searchQuery.trim().toLowerCase()
+    let result = q ? transactions : filterTransactionsByMonth(transactions, selectedMonth)
+    if (q) {
+      result = result.filter((t) =>
+        t.description.toLowerCase().includes(q) || t.category.toLowerCase().includes(q)
+      )
+    }
     if (typeFilter !== "all") {
       result = result.filter((t) => t.type === typeFilter)
     }
     return result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [transactions, selectedMonth, typeFilter])
+  }, [transactions, selectedMonth, typeFilter, searchQuery])
 
   // Transacciones efectivamente renderizadas en pantalla
   const visibleTransactions = useMemo(() => {
