@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react"
-import { Check, CreditCard, DollarSign, Pencil, PiggyBank, Receipt, TrendingDown, Wallet, X } from "lucide-react"
+import { Check, Pencil, PiggyBank, Receipt, TrendingDown, Wallet, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
-import { monthLabel } from "../../utils/month"
 import type { MonthStatus, MonthSummary } from "../../types/budget"
 import { parseAmount } from "./helpers"
 
@@ -70,7 +69,7 @@ export const BentoKpis = ({
     const isNegative = s.available < -0.005
     return (
       <div
-        className="glass-panel relative flex flex-col justify-between overflow-hidden rounded-3xl p-4 sm:p-5"
+        className="glass-panel relative col-span-2 flex flex-col justify-between overflow-hidden rounded-3xl p-4 sm:col-span-1 sm:p-5"
         style={{
           backgroundImage: isNegative
             ? "radial-gradient(ellipse 90% 80% at 90% 10%, rgba(248, 113, 113, 0.15), transparent 70%)"
@@ -157,7 +156,9 @@ export const BentoKpis = ({
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 text-white/55">
             <Wallet className="h-3.5 w-3.5 text-cyan-300" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">Nómina & Fijos</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">
+              Nómina<span className="hidden sm:inline"> & Fijos</span>
+            </span>
           </div>
           {hasIncome && !editingIncome && (
             <button
@@ -165,10 +166,11 @@ export const BentoKpis = ({
                 setIncomeVal(String(s.income).replace(".", ","))
                 setEditingIncome(true)
               }}
-              className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-white/55 transition-colors hover:bg-white/[0.08] hover:text-white"
+              aria-label="Editar nómina"
+              className="-mr-1 -mt-1 flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-white/55 transition-colors hover:bg-white/[0.08] hover:text-white sm:mr-0 sm:mt-0"
             >
               <Pencil className="h-3 w-3" />
-              <span>Editar</span>
+              <span className="hidden sm:inline">Editar</span>
             </button>
           )}
         </div>
@@ -216,11 +218,11 @@ export const BentoKpis = ({
             </form>
           ) : (
             <>
-              <p className="text-3xl font-extrabold tracking-tight tabular-nums text-white sm:text-4xl">
+              <p className="text-2xl font-extrabold tracking-tight tabular-nums text-white sm:text-4xl">
                 {fmt(s.netIncome)}
               </p>
               <p className="mt-1 text-xs text-white/65">
-                Nómina <span className="font-semibold text-white/90">{fmt(s.income)}</span>
+                Nómina <span className="font-semibold text-white/90">{fmt(s.income ?? 0)}</span>
                 {s.totalFixed > 0 ? (
                   <>
                     {" "}
@@ -238,7 +240,7 @@ export const BentoKpis = ({
           {s.totalFixed > 0 ? (
             <button
               onClick={onEditFixed}
-              className="flex items-center gap-1.5 text-white/60 transition-colors hover:text-cyan-300"
+              className="flex items-center gap-1.5 text-left text-white/60 transition-colors hover:text-cyan-300"
             >
               <Receipt className="h-3.5 w-3.5 text-amber-300" />
               <span>{s.fixedExpenses.length} gastos fijos configurados</span>
@@ -246,7 +248,7 @@ export const BentoKpis = ({
           ) : (
             <button
               onClick={onEditFixed}
-              className="text-white/45 transition-colors hover:text-cyan-300"
+              className="text-left text-white/45 transition-colors hover:text-cyan-300"
             >
               + Añadir gastos fijos mensuales
             </button>
@@ -263,7 +265,9 @@ export const BentoKpis = ({
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 text-white/55">
             <PiggyBank className="h-3.5 w-3.5 text-cyan-300" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">Ahorro Apartado</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">
+              Ahorro<span className="hidden sm:inline"> Apartado</span>
+            </span>
           </div>
           <span className="rounded-full bg-cyan-400/10 border border-cyan-400/20 px-2 py-0.5 text-[11px] font-semibold text-cyan-300 tabular-nums">
             {hasIncome && s.netIncome > 0
@@ -273,7 +277,7 @@ export const BentoKpis = ({
         </div>
 
         <div className="my-2.5 sm:my-3">
-          <p className="text-3xl font-extrabold tracking-tight tabular-nums text-white sm:text-4xl">
+          <p className="text-2xl font-extrabold tracking-tight tabular-nums text-white sm:text-4xl">
             {fmt(s.saved)}
           </p>
           <p className="mt-1 text-xs text-white/65">
@@ -297,7 +301,7 @@ export const BentoKpis = ({
   // Tarjeta 4: Gastado en Sobres
   const renderSpentCard = () => {
     return (
-      <div className="glass-panel relative flex flex-col justify-between overflow-hidden rounded-3xl p-4 sm:p-5">
+      <div className="glass-panel relative col-span-2 flex flex-col justify-between overflow-hidden rounded-3xl p-4 sm:col-span-1 sm:p-5">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 text-white/55">
             <TrendingDown className="h-3.5 w-3.5 text-amber-300" />
@@ -337,7 +341,7 @@ export const BentoKpis = ({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       {renderAvailableCard()}
       {renderIncomeCard()}
       {renderSavingsCard()}

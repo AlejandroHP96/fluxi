@@ -44,7 +44,7 @@ const EnvelopeCard = ({
   const color = catColor(categories, e.category)
 
   return (
-    <div className="glass-panel flex flex-col justify-between rounded-2xl p-4 transition-all duration-300 hover:border-cyan-400/30">
+    <div className="glass-panel flex min-w-0 flex-col justify-between rounded-2xl p-3.5 transition-all duration-300 hover:border-cyan-400/30 sm:p-4">
       <div>
         {/* Cabecera del sobre */}
         <div className="flex items-center justify-between gap-2">
@@ -61,19 +61,19 @@ const EnvelopeCard = ({
         </div>
 
         {/* Cifra principal */}
-        <div className="my-3">
+        <div className="my-2.5 sm:my-3">
           {hasIncome ? (
             <div>
-              <p className={`text-xl font-bold tabular-nums tracking-tight sm:text-2xl ${st.text}`}>
-                {over ? `Te pasas ${fmt(-e.remaining)}` : `Quedan ${fmt(e.remaining)}`}
+              <p className={`text-lg font-bold tabular-nums tracking-tight sm:text-2xl ${st.text}`}>
+                {fmt(Math.abs(e.remaining))}
               </p>
               <p className="mt-0.5 text-xs text-white/55 tabular-nums">
-                {fmt(e.spent)} gastados de {fmt(e.allocated)}
+                {over ? "por encima de" : "quedan de"} {fmt(e.allocated)}
               </p>
             </div>
           ) : (
             <div>
-              <p className="text-xl font-bold tabular-nums text-white sm:text-2xl">{fmt(e.spent)}</p>
+              <p className="text-lg font-bold tabular-nums text-white sm:text-2xl">{fmt(e.spent)}</p>
               <p className="mt-0.5 text-xs text-white/50">Gastado hasta ahora</p>
             </div>
           )}
@@ -90,7 +90,7 @@ const EnvelopeCard = ({
                 style={{ width: `${Math.min(100, Math.max(0, e.pctSpent))}%` }}
               />
             </div>
-            <div className="flex items-center justify-between text-[11px] text-white/50 tabular-nums">
+            <div className="flex flex-wrap items-center justify-between gap-x-2 text-[11px] text-white/50 tabular-nums">
               <span>{Math.round(e.pctSpent)} % gastado</span>
               {e.status === "casi" && <span className="text-amber-300 font-medium">Alerta 90%</span>}
               {e.status === "pasado" && <span className="text-red-400 font-medium">Límite superado</span>}
@@ -122,7 +122,7 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
           {hasIncome && s.totalFixed > 0 && (
             <p className="mt-0.5 text-xs text-white/50">
               Reparto sobre <span className="font-medium text-white/75 tabular-nums">{fmt(s.netIncome)}</span>{" "}
-              (nómina {fmt(s.income)} − {fmt(s.totalFixed)} fijos)
+              (nómina {fmt(s.income ?? 0)} − {fmt(s.totalFixed)} fijos)
             </p>
           )}
         </div>
@@ -150,7 +150,7 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
       )}
 
       {/* Cuadrícula de tarjetas de sobres */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-3.5 lg:grid-cols-3">
         {/* Sobres de gasto variable */}
         {s.envelopes.map((e) => (
           <EnvelopeCard key={e.category.id} e={e} categories={categories} hasIncome={hasIncome} />
@@ -163,13 +163,13 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
 
         {/* Tarjeta de gastos huérfanos sin categoría si los hay */}
         {s.uncategorized > 0.005 && (
-          <div className="glass-panel flex flex-col justify-between rounded-2xl border-dashed border-amber-400/30 p-4">
+          <div className="glass-panel flex flex-col justify-between rounded-2xl border-dashed border-amber-400/30 p-3.5 sm:p-4">
             <div className="flex items-center gap-2">
               <HelpCircle className="h-4 w-4 shrink-0 text-amber-300" />
               <span className="text-sm font-semibold text-white/85">Sin categoría</span>
             </div>
             <div className="my-3">
-              <p className="text-xl font-bold tabular-nums text-amber-300 sm:text-2xl">{fmt(s.uncategorized)}</p>
+              <p className="text-lg font-bold tabular-nums text-amber-300 sm:text-2xl">{fmt(s.uncategorized)}</p>
               <p className="mt-0.5 text-xs text-white/50">Gastos en categorías eliminadas</p>
             </div>
           </div>
@@ -177,7 +177,7 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
 
         {/* Tarjeta de dinero sin asignar si los % no suman 100 */}
         {(s.unassigned > 0.005 || (!hasIncome && s.unassignedPct > 0)) && (
-          <div className="glass-panel flex flex-col justify-between rounded-2xl border-dashed border-white/15 p-4">
+          <div className="glass-panel flex flex-col justify-between rounded-2xl border-dashed border-white/15 p-3.5 sm:p-4">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <CircleDashed className="h-4 w-4 shrink-0 text-white/60" />
@@ -188,7 +188,7 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
               </span>
             </div>
             <div className="my-3">
-              <p className="text-xl font-bold tabular-nums text-white/85 sm:text-2xl">
+              <p className="text-lg font-bold tabular-nums text-white/85 sm:text-2xl">
                 {hasIncome ? fmt(s.unassigned) : `${pct(s.unassignedPct)}`}
               </p>
               <p className="mt-0.5 text-xs text-white/50">Dinero libre no reservado</p>

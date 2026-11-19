@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Activity, BarChart3, PieChart } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { daysInMonth, monthLabel, shiftMonth, summarizeMonth } from "../../utils/month"
@@ -26,6 +26,18 @@ export const MonthCharts = ({
 }: MonthChartsProps) => {
   const [activeTab, setActiveTab] = useState<ChartTab>("daily")
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
+  // Ancho real del área de la gráfica: el SVG se dibuja a ese ancho (sin escalar ni dejar márgenes vacíos)
+  const chartRef = useRef<HTMLDivElement>(null)
+  const [chartWidth, setChartWidth] = useState(640)
+  // useLayoutEffect: mide antes de pintar, así el móvil no ve un fotograma a 640px
+  useLayoutEffect(() => {
+    const el = chartRef.current
+    if (!el) return
+    setChartWidth(Math.max(240, Math.round(el.clientWidth)))
+    const ro = new ResizeObserver(([entry]) => setChartWidth(Math.max(240, Math.round(entry.contentRect.width))))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   // 1. Datos para evolución diaria (mes en curso)
   const dailyData = useMemo(() => {
@@ -129,12 +141,13 @@ export const MonthCharts = ({
       100
     ) * 1.1
 
-    const width = 640
+    const width = chartWidth
     const height = 180
-    const paddingX = 25
-    const paddingY = 20
+    const paddingX = 12
+    const paddingY = 16
+    const axisH = 18
     const chartW = width - paddingX * 2
-    const chartH = height - paddingY * 2
+    const chartH = height - paddingY - axisH
 
     const getX = (day: number) => paddingX + ((day - 1) / (totalDays - 1)) * chartW
     const getY = (val: number) => paddingY + chartH - (val / maxVal) * chartH
@@ -155,7 +168,7 @@ export const MonthCharts = ({
 
     return (
       <div className="relative">
-        <div className="mb-3 flex items-center justify-between text-xs text-white/60">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-white/60">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-cyan-400" />
@@ -166,18 +179,25 @@ export const MonthCharts = ({
               Ritmo presupuestado
             </span>
           </div>
-          {hovered && (
-            <span className="font-medium text-white/90">
-              Día {hovered.day}: {fmt(hovered.accumulated)} acum.{" "}
-              {hovered.spent > 0 && `(+${fmt(hovered.spent)})`}
-            </span>
-          )}
+          {/* Siempre presente (invisible sin hover) para que la gráfica no salte al pasar el dedo */}
+          <span className={`min-h-[1rem] font-medium text-white/90 ${hovered ? "" : "invisible"}`}>
+            {hovered ? (
+              <>
+                Día {hovered.day}: {fmt(hovered.accumulated)} acum.{" "}
+                {hovered.spent > 0 && `(+${fmt(hovered.spent)})`}
+              </>
+            ) : (
+              "–"
+            )}
+          </span>
         </div>
 
         <div className="w-full overflow-hidden">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="w-full h-48 overflow-visible"
+            width={width}
+            height={height}
+            className="block overflow-visible"
             onMouseLeave={() => setHoverIndex(null)}
           >
             <defs>
@@ -256,6 +276,20 @@ export const MonthCharts = ({
               )
             })}
 
+            {/* Eje de días */}
+            {[1, 10, 20, totalDays].map((d, i, arr) => (
+              <text
+                key={d}
+                x={getX(d)}
+                y={height - 4}
+                textAnchor={i === 0 ? "start" : i === arr.length - 1 ? "end" : "middle"}
+                fill="rgba(255,255,255,0.4)"
+                fontSize="11"
+              >
+                Día {d}
+              </text>
+            ))}
+
             {/* Marcador vertical de día actual */}
             {s.isCurrent && (
               <line
@@ -270,13 +304,6 @@ export const MonthCharts = ({
           </svg>
         </div>
 
-        {/* Eje de días inferior */}
-        <div className="mt-1 flex justify-between px-3 text-[11px] text-white/40">
-          <span>Día 1</span>
-          <span>Día 10</span>
-          <span>Día 20</span>
-          <span>Día {totalDays}</span>
-        </div>
       </div>
     )
   }
@@ -284,12 +311,12 @@ export const MonthCharts = ({
   // RENDER: Historial de los últimos 6 meses
   const renderHistoryChart = () => {
     const maxVal = Math.max(...historyData.map((d) => Math.max(d.netIncome, d.spent, d.saved)), 100) * 1.15
-    const width = 640
+    const width = chartWidth
     const height = 180
-    const paddingX = 20
-    const paddingY = 20
+    const paddingX = 8
+    const paddingY = 16
     const chartW = width - paddingX * 2
-    const chartH = height - paddingY * 2
+    const chartH = height - paddingY - 20
 
     const colWidth = chartW / historyData.length
     const barWidth = Math.min(22, colWidth * 0.28)
@@ -298,7 +325,7 @@ export const MonthCharts = ({
 
     return (
       <div>
-        <div className="mb-3 flex items-center justify-between text-xs text-white/60">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-white/60">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-sm bg-cyan-400" />
@@ -313,17 +340,17 @@ export const MonthCharts = ({
               Ahorro
             </span>
           </div>
-          {hovered && (
-            <span className="font-medium text-white/90">
-              {hovered.fullLabel}: Gastado {fmt(hovered.spent)} de {fmt(hovered.netIncome)}
-            </span>
-          )}
+          <span className={`min-h-[1rem] font-medium text-white/90 ${hovered ? "" : "invisible"}`}>
+            {hovered ? `${hovered.fullLabel}: Gastado ${fmt(hovered.spent)} de ${fmt(hovered.netIncome)}` : "–"}
+          </span>
         </div>
 
         <div className="w-full overflow-hidden">
           <svg
             viewBox={`0 0 ${width} ${height}`}
-            className="w-full h-48 overflow-visible"
+            width={width}
+            height={height}
+            className="block overflow-visible"
             onMouseLeave={() => setHoverIndex(null)}
           >
             {/* Líneas guía horizontales */}
@@ -483,7 +510,7 @@ export const MonthCharts = ({
   }
 
   return (
-    <div className="glass-panel overflow-hidden rounded-3xl p-5 sm:p-6">
+    <div className="glass-panel overflow-hidden rounded-3xl p-4 sm:p-6">
       {/* Header con tabs */}
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] pb-3.5">
         <div className="flex items-center gap-2">
@@ -491,19 +518,20 @@ export const MonthCharts = ({
           <h2 className="text-sm font-semibold tracking-tight text-white">Análisis y Gráficas</h2>
         </div>
 
-        <div className="flex rounded-xl bg-white/[0.06] p-1 text-xs font-medium">
+        <div className="grid w-full grid-cols-3 rounded-xl bg-white/[0.06] p-1 text-xs font-medium sm:flex sm:w-auto">
           <button
             type="button"
             onClick={() => {
               setActiveTab("daily")
               setHoverIndex(null)
             }}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 transition-all sm:px-2.5 ${
               activeTab === "daily" ? "bg-white/15 text-white shadow" : "text-white/60 hover:text-white"
             }`}
           >
             <Activity className="h-3.5 w-3.5" />
-            <span>Evolución diaria</span>
+            <span className="sm:hidden">Diario</span>
+            <span className="hidden sm:inline">Evolución diaria</span>
           </button>
           <button
             type="button"
@@ -511,12 +539,13 @@ export const MonthCharts = ({
               setActiveTab("history")
               setHoverIndex(null)
             }}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 transition-all sm:px-2.5 ${
               activeTab === "history" ? "bg-white/15 text-white shadow" : "text-white/60 hover:text-white"
             }`}
           >
             <BarChart3 className="h-3.5 w-3.5" />
-            <span>Últimos 6 meses</span>
+            <span className="sm:hidden">6 meses</span>
+            <span className="hidden sm:inline">Últimos 6 meses</span>
           </button>
           <button
             type="button"
@@ -524,20 +553,23 @@ export const MonthCharts = ({
               setActiveTab("categories")
               setHoverIndex(null)
             }}
-            className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 transition-all ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 transition-all sm:px-2.5 ${
               activeTab === "categories" ? "bg-white/15 text-white shadow" : "text-white/60 hover:text-white"
             }`}
           >
             <PieChart className="h-3.5 w-3.5" />
-            <span>Por sobres</span>
+            <span className="sm:hidden">Sobres</span>
+            <span className="hidden sm:inline">Por sobres</span>
           </button>
         </div>
       </div>
 
       {/* Contenido del gráfico activo */}
-      {activeTab === "daily" && renderDailyChart()}
-      {activeTab === "history" && renderHistoryChart()}
-      {activeTab === "categories" && renderCategoriesDistribution()}
+      <div ref={chartRef}>
+        {activeTab === "daily" && renderDailyChart()}
+        {activeTab === "history" && renderHistoryChart()}
+        {activeTab === "categories" && renderCategoriesDistribution()}
+      </div>
     </div>
   )
 }

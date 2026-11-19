@@ -62,7 +62,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
 
         <button
           onClick={onAdd}
-          className="liquid-button flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-[#04202a]"
+          className="liquid-button hidden items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-[#04202a] sm:flex"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           <span>Apuntar gasto</span>
@@ -138,23 +138,26 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
           No hay gastos que coincidan con la búsqueda «{search}».
         </div>
       ) : (
-        <div className="space-y-4">
+        // Una sola tarjeta con los días como separadores
+        <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.025]">
           {groups.map((g) => (
-            <div key={g.date}>
-              <div className="mb-1.5 flex items-baseline justify-between px-1">
-                <span className="text-xs font-semibold uppercase tracking-wider text-white/60 first-letter:uppercase">
+            <div key={g.date} className="border-white/[0.07] [&:not(:first-child)]:border-t">
+              <div className="flex items-baseline justify-between bg-white/[0.03] px-3.5 py-1.5">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/55 first-letter:uppercase">
                   {dayLabel(g.date, today)}
                 </span>
-                <span className="text-xs font-medium tabular-nums text-white/50">{fmt(g.total)}</span>
+                {g.items.length > 1 && (
+                  <span className="text-[11px] font-medium tabular-nums text-white/45">{fmt(g.total)}</span>
+                )}
               </div>
-              <ul className="divide-y divide-white/[0.06] overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.025]">
+              <ul className="divide-y divide-white/[0.06]">
                 {g.items.map((e) => {
                   const cat = resolveCategory(e.category, categories)
                   return (
                     <li key={e.id}>
                       <button
                         onClick={() => onSelect(e)}
-                        className="flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors hover:bg-white/[0.05] active:bg-white/[0.08]"
+                        className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-white/[0.05] active:bg-white/[0.08]"
                       >
                         <span
                           className="h-2.5 w-2.5 shrink-0 rounded-full"
