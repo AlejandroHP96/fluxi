@@ -3,6 +3,7 @@ import { AlertTriangle, Plus } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
 import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
 import type { Expense } from "../types/budget"
+import { DEMO_EMAIL } from "../constants/demo"
 import { AppHeader } from "../components/budget/AppHeader"
 import { MonthNav } from "../components/budget/MonthNav"
 import { BentoKpis } from "../components/budget/BentoKpis"
@@ -125,6 +126,12 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         />
 
         {errorBanner}
+
+        {email === DEMO_EMAIL && (
+          <p className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-2.5 text-sm text-cyan-100">
+            Modo demo: puedes probarlo todo, pero los cambios no se guardan y al recargar vuelve a empezar.
+          </p>
+        )}
 
         {/* Fila 1: KPIs Bento */}
         <BentoKpis

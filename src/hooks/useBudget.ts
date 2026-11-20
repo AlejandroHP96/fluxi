@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import {
   addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from "firebase/firestore"
@@ -10,7 +10,7 @@ import type { CategoryMemory } from "../utils/importQueue"
 
 // Gastos (colección "expenses") y ajustes del usuario en budgets/{uid}: categorías con %, nómina de cada
 // mes y la memoria de categorías elegidas al importar
-export const useBudget = (userId: string | undefined) => {
+const useFirestoreBudget = (userId: string | undefined) => {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [categories, setCategories] = useState<BudgetCategory[]>([])
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
@@ -18,23 +18,22 @@ export const useBudget = (userId: string | undefined) => {
   const [memory, setMemory] = useState<CategoryMemory>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const demoSeeded = useRef(false)
 
   useEffect(() => {
+    // Al cambiar de usuario (o salir) no se enseñan los datos del anterior
+    setExpenses([])
+    setCategories([])
+    setFixedExpenses([])
+    setIncomeMap({})
+    setMemory({})
+    setError(null)
+    setLoading(true)
     if (!userId) return
-    // "Cargando" termina con la primera lectura de cada fuente (aunque venga de la caché local);
-    // la demo solo se rellena cuando el servidor confirma que está vacía
+    // "Cargando" termina con la primera lectura de cada fuente (aunque venga de la caché local)
     const loaded = { expenses: false, settings: false }
-    const server: { expenses: boolean | null; settings: boolean | null } = { expenses: null, settings: null } // ¿vacío?
     const markLoaded = (k: "expenses" | "settings") => {
       loaded[k] = true
       if (loaded.expenses && loaded.settings) setLoading(false)
-    }
-    const maybeSeedDemo = () => {
-      if (userId === DEMO_UID && server.expenses && server.settings && !demoSeeded.current) {
-        demoSeeded.current = true
-        void seedDemo(userId)
-      }
     }
     const onErr = (k: "expenses" | "settings") => (e: Error) => {
       setError(e.message)
@@ -60,10 +59,6 @@ export const useBudget = (userId: string | undefined) => {
         .map(({ _created: _, ...e }) => e as Expense)
       setExpenses(list)
       markLoaded("expenses")
-      if (server.expenses === null && !s.metadata.fromCache) {
-        server.expenses = list.length === 0
-        maybeSeedDemo()
-      }
     }, onErr("expenses"))
 
     const unsubSettings = onSnapshot(doc(db, "budgets", userId), (s) => {
@@ -73,10 +68,6 @@ export const useBudget = (userId: string | undefined) => {
       setIncomeMap((data?.income as Record<string, number> | undefined) ?? {})
       setMemory((data?.memory as CategoryMemory | undefined) ?? {})
       markLoaded("settings")
-      if (server.settings === null && !s.metadata.fromCache) {
-        server.settings = !data?.categories?.length
-        maybeSeedDemo()
-      }
     }, onErr("settings"))
 
     return () => {
@@ -154,7 +145,7 @@ export const useBudget = (userId: string | undefined) => {
   }
 }
 
-export type BudgetApi = ReturnType<typeof useBudget>
+export type BudgetApi = ReturnType<typeof useFirestoreBudget>
 
 // Plantilla que se propone al crear las categorías por primera vez
 export const CATEGORY_TEMPLATE: Array<Omit<BudgetCategory, "id">> = [
@@ -166,34 +157,116 @@ export const CATEGORY_TEMPLATE: Array<Omit<BudgetCategory, "id">> = [
   { name: "Otros", pct: 10, savings: false },
 ]
 
-// Datos de ejemplo de la demo: nómina de 1.800 €, la plantilla de categorías y gastos en lo que va de mes
-async function seedDemo(userId: string) {
+// Datos de ejemplo de la demo: nómina de 1.800 €, la plantilla de categorías y gastos en lo que va de mes.
+// Se generan cada vez con el mes actual, así la demo nunca sale vacía.
+const DEMO_SAMPLE: Array<[number, string, string, number]> = [
+  [1, "Alquiler (parte)", "Vivienda", 450],
+  [2, "Mercadona", "Alimentación", 62.4],
+  [3, "Gasolina", "Transporte", 40],
+  [5, "Spotify", "Ocio", 10.99],
+  [6, "Cena con amigos", "Ocio", 28.5],
+  [8, "Mercadona", "Alimentación", 48.15],
+  [10, "Farmacia", "Otros", 12.3],
+  [12, "Luz", "Vivienda", 54.2],
+  [14, "Cine", "Ocio", 18],
+  [16, "Lidl", "Alimentación", 35.6],
+  [19, "Zapatillas", "Otros", 59.99],
+  [21, "Gasolina", "Transporte", 38],
+  [24, "Mercadona", "Alimentación", 51.8],
+  [27, "Café y desayuno", "Ocio", 7.5],
+]
+
+function demoData() {
   const today = new Date()
-  const day = today.getDate()
-  const cats = CATEGORY_TEMPLATE.map((c) => ({ ...c, id: newCategoryId() }))
-  const idOf = (name: string) => cats.find((c) => c.name === name)!.id
-  const sample: Array<[number, string, string, number]> = [
-    [1, "Alquiler (parte)", "Vivienda", 450],
-    [2, "Mercadona", "Alimentación", 62.4],
-    [3, "Gasolina", "Transporte", 40],
-    [5, "Spotify", "Ocio", 10.99],
-    [6, "Cena con amigos", "Ocio", 28.5],
-    [8, "Mercadona", "Alimentación", 48.15],
-    [10, "Farmacia", "Otros", 12.3],
-    [12, "Luz", "Vivienda", 54.2],
-    [14, "Cine", "Ocio", 18],
-    [16, "Lidl", "Alimentación", 35.6],
-    [19, "Zapatillas", "Otros", 59.99],
-    [21, "Gasolina", "Transporte", 38],
-    [24, "Mercadona", "Alimentación", 51.8],
-    [27, "Café y desayuno", "Ocio", 7.5],
-  ]
-  const batch = writeBatch(db)
-  for (const [d, concept, category, amount] of sample) {
-    if (d > day) continue
-    const date = toDateKey(new Date(today.getFullYear(), today.getMonth(), d))
-    batch.set(doc(collection(db, "expenses")), { userId, concept, category: idOf(category), amount, date, createdAt: serverTimestamp() })
+  const categories: BudgetCategory[] = CATEGORY_TEMPLATE.map((c) => ({ ...c, id: newCategoryId() }))
+  const idOf = (name: string) => categories.find((c) => c.name === name)!.id
+  const expenses: Expense[] = DEMO_SAMPLE.filter(([d]) => d <= today.getDate())
+    .reverse() // más recientes primero, como la lista real
+    .map(([d, concept, category, amount]) => ({
+      id: newCategoryId(),
+      userId: DEMO_UID,
+      concept,
+      category: idOf(category),
+      amount,
+      date: toDateKey(new Date(today.getFullYear(), today.getMonth(), d)),
+    }))
+  return { categories, expenses, income: { [toMonthKey(today)]: 1800 } as Record<string, number> }
+}
+
+// Cuenta demo: todo vive en memoria. Se puede probar la app entera, pero nada se guarda en Firestore
+// (las reglas además le niegan cualquier escritura) y al recargar vuelve al estado inicial.
+const useDemoBudget = (active: boolean): BudgetApi => {
+  const [initial] = useState(demoData)
+  const [expenses, setExpenses] = useState<Expense[]>(initial.expenses)
+  const [categories, setCategories] = useState<BudgetCategory[]>(initial.categories)
+  const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
+  const [income, setIncomeMap] = useState<Record<string, number>>(initial.income)
+  const [memory, setMemory] = useState<CategoryMemory>({})
+
+  // Al entrar de nuevo en la demo se parte de los datos de ejemplo (durante el render, sin un fotograma con lo anterior)
+  const [wasActive, setWasActive] = useState(active)
+  if (active !== wasActive) {
+    setWasActive(active)
+    if (active) {
+      const d = demoData()
+      setExpenses(d.expenses)
+      setCategories(d.categories)
+      setFixedExpenses([])
+      setIncomeMap(d.income)
+      setMemory({})
+    }
   }
-  batch.set(doc(db, "budgets", userId), { userId, categories: cats, income: { [toMonthKey(today)]: 1800 } }, { merge: true })
-  await batch.commit().catch(() => {})
+
+  const sortList = (list: Expense[]) => [...list].sort((a, b) => b.date.localeCompare(a.date))
+  const ok = async () => true
+
+  return {
+    expenses, categories, fixedExpenses, income, memory, loading: false, error: null,
+    addExpense: async (e: NewExpense) => {
+      const id = newCategoryId()
+      setExpenses((l) => sortList([{ ...e, amount: Math.abs(Number(e.amount)), id, userId: DEMO_UID }, ...l]))
+      return id
+    },
+    updateExpense: (id: string, e: NewExpense) => {
+      setExpenses((l) => sortList(l.map((x) => (x.id === id ? { ...x, ...e, amount: Math.abs(Number(e.amount)) } : x))))
+      return ok()
+    },
+    deleteExpense: (id: string) => {
+      setExpenses((l) => l.filter((x) => x.id !== id))
+      return ok()
+    },
+    reassignExpenses: (ids: string[], categoryId: string) => {
+      const set = new Set(ids)
+      setExpenses((l) => l.map((x) => (set.has(x.id) ? { ...x, category: categoryId } : x)))
+      return ok()
+    },
+    setIncome: (month: string, amount: number | null) => {
+      setIncomeMap((m) => {
+        const next = { ...m }
+        if (amount === null) delete next[month]
+        else next[month] = amount
+        return next
+      })
+      return ok()
+    },
+    saveCategories: (list: BudgetCategory[]) => {
+      setCategories(list.map((c) => ({ id: c.id || newCategoryId(), name: c.name.trim(), pct: Number(c.pct) || 0, savings: Boolean(c.savings) })))
+      return ok()
+    },
+    saveFixedExpenses: (list: FixedExpense[]) => {
+      setFixedExpenses(list.map((f) => ({ id: f.id || newCategoryId(), name: f.name.trim(), amount: Math.abs(Number(f.amount)) || 0 })))
+      return ok()
+    },
+    remember: (key: string, choice: string) => {
+      setMemory((m) => ({ ...m, [key]: choice }))
+      return ok()
+    },
+  }
+}
+
+export const useBudget = (userId: string | undefined): BudgetApi => {
+  const isDemo = userId === DEMO_UID
+  const remote = useFirestoreBudget(isDemo ? undefined : userId)
+  const demo = useDemoBudget(isDemo)
+  return isDemo ? demo : remote
 }

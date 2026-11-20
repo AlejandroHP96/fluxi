@@ -6,6 +6,12 @@ service cloud.firestore {
       return request.auth != null && data.userId == request.auth.uid;
     }
 
+    // Cuenta demo pública (botón «Entrar como Tester»): funciona en memoria y nunca escribe en Firestore.
+    // Debe coincidir con DEMO_UID de src/constants/demo.ts
+    function notDemo() {
+      return request.auth.uid != 'jTQDmVrbmDSX657q7Of8E0O0EfK2';
+    }
+
     // Campos de un gasto: tipos y tamaños acotados (la cuenta demo es pública, así nadie mete basura enorme)
     function okAmount(d) { return d.amount is number && d.amount > 0 && d.amount < 1000000; }
     function okConcept(d) { return d.concept is string && d.concept.size() <= 200; }
@@ -24,12 +30,13 @@ service cloud.firestore {
 
     // Gastos apuntados a mano o importados del CSV de Revolut
     match /expenses/{id} {
-      allow read, delete: if owns(resource.data);
-      allow create: if owns(request.resource.data)
+      allow read: if owns(resource.data);
+      allow delete: if owns(resource.data) && notDemo();
+      allow create: if owns(request.resource.data) && notDemo()
         && request.resource.data.keys().hasOnly(['userId', 'amount', 'concept', 'category', 'date', 'createdAt'])
         && validExpense(request.resource.data);
       // Solo se pueden cambiar estos campos (los gastos antiguos pueden traer otros y se respetan)
-      allow update: if owns(resource.data) && owns(request.resource.data)
+      allow update: if owns(resource.data) && owns(request.resource.data) && notDemo()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date'])
         && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys());
     }
@@ -45,13 +52,13 @@ service cloud.firestore {
 
     match /budgets/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
-      allow create: if request.auth != null && request.auth.uid == uid
+      allow create: if request.auth != null && request.auth.uid == uid && notDemo()
         && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory'])
         && validBudget(request.resource.data);
-      allow update: if request.auth != null && request.auth.uid == uid
+      allow update: if request.auth != null && request.auth.uid == uid && notDemo()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory'])
         && validBudget(request.resource.data);
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
     }
 
     // El resto (colecciones de la versión anterior: transactions, transfers, accounts, goals, finance)
