@@ -1,7 +1,7 @@
-import { categorize, conceptKey } from "./categorize"
-import { resolveCategory, shiftMonth } from "./month"
-import type { CsvExpense } from "./revolutCsv"
-import type { BudgetCategory, Expense } from "../types/budget"
+import { categorize, conceptKey } from "./categorize.js"
+import { resolveCategory, shiftMonth } from "./month.js"
+import type { CsvExpense } from "./revolutCsv.js"
+import type { BudgetCategory, Expense } from "../types/budget.js"
 
 // "Omitir" como elección (también se recuerda por concepto)
 export const SKIP = "__skip__"

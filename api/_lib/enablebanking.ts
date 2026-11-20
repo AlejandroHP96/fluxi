@@ -142,11 +142,13 @@ export interface BankExpense {
   time: string // siempre "" (la API no da hora)
   concept: string
   amount: number // positivo
+  ref: string // id del movimiento en el banco (o fecha|importe|concepto si no trae): la importación automática no repite uno ya visto
 }
 
 // Solo cargos ya contabilizados en euros, con el mismo formato que las filas del CSV de Revolut
 export function toExpenses(txs: EbTransaction[]): BankExpense[] {
   const out: BankExpense[] = []
+  const refs = new Set<string>()
   for (const t of txs) {
     if (t.status && t.status !== "BOOK") continue
     if (t.credit_debit_indicator !== "DBIT") continue
@@ -155,7 +157,13 @@ export function toExpenses(txs: EbTransaction[]): BankExpense[] {
     const date = (t.booking_date || t.value_date || t.transaction_date || "").slice(0, 10)
     if (!(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
     const concept = (t.creditor?.name || (t.remittance_information || []).join(" ") || "Gasto").replace(/\s+/g, " ").trim()
-    out.push({ date, time: "", concept: concept.slice(0, 200), amount: Math.round(amount * 100) / 100 })
+    const rounded = Math.round(amount * 100) / 100
+    const base = t.entry_reference || t.transaction_id || `${date}|${rounded}|${concept}`
+    // Dos movimientos sin id iguales el mismo día (dos cafés de 1,50 €) no deben contar como uno
+    let ref = base
+    for (let n = 2; refs.has(ref); n++) ref = `${base}#${n}`
+    refs.add(ref)
+    out.push({ date, time: "", concept: concept.slice(0, 200), amount: rounded, ref })
   }
   return out.sort((a, b) => a.date.localeCompare(b.date))
 }

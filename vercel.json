@@ -1,5 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [{ "path": "/api/bank-sync", "schedule": "0 6 * * *" }],
   "headers": [
     {
       "source": "/(.*)",

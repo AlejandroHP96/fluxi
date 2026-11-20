@@ -32,7 +32,12 @@ describe("toExpenses", () => {
   })
 
   it("convierte cargos contabilizados al formato del CSV", () => {
-    expect(toExpenses([tx({})])).toEqual([{ date: "2026-11-19", time: "", concept: "Mercadona", amount: 12.3 }])
+    expect(toExpenses([tx({})])).toEqual([{ date: "2026-11-19", time: "", concept: "Mercadona", amount: 12.3, ref: "2026-11-19|12.3|Mercadona" }])
+  })
+
+  it("usa el id del banco como ref y distingue movimientos iguales sin id", () => {
+    expect(toExpenses([tx({ entry_reference: "abc" })])[0].ref).toBe("abc")
+    expect(toExpenses([tx({}), tx({})]).map((e) => e.ref)).toEqual(["2026-11-19|12.3|Mercadona", "2026-11-19|12.3|Mercadona#2"])
   })
 
   it("ignora abonos, pendientes y otras monedas", () => {
