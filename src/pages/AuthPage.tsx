@@ -12,16 +12,18 @@ const FIREBASE_ERRORS: Record<string, string> = {
   "auth/wrong-password":        "Contraseña incorrecta.",
   "auth/invalid-credential":    "Email o contraseña incorrectos.",
   "auth/too-many-requests":     "Demasiados intentos. Espera un momento.",
+  "auth/missing-email":         "Escribe tu email.",
 }
 
 interface AuthPageProps {
   onSignIn: (email: string, password: string) => Promise<AuthResult>
   onSignUp: (email: string, password: string) => Promise<AuthResult>
+  onResetPassword: (email: string) => Promise<AuthResult>
 }
 
-type AuthMode = "login" | "signup"
+type AuthMode = "login" | "signup" | "reset"
 
-const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
+const AuthPage = ({ onSignIn, onSignUp, onResetPassword }: AuthPageProps) => {
   const [mode, setMode]       = useState<AuthMode>("login")
   const [email, setEmail]     = useState("")
   const [password, setPass]   = useState("")
@@ -30,6 +32,7 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
   const [err, setErr]         = useState("")
 
   const handle = async () => {
+    if (mode === "reset") return handleReset()
     if (!email || !password) { setErr("Completa todos los campos."); return }
     setLoading(true); setErr(""); setMsg("")
 
@@ -51,11 +54,24 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
     setLoading(false)
   }
 
-  const toggleMode = () => {
-    setMode(mode === "login" ? "signup" : "login")
+  // Mensaje igual exista o no la cuenta, para no revelar qué emails están registrados
+  const handleReset = async () => {
+    if (!email) { setErr("Escribe tu email."); return }
+    if (email.trim().toLowerCase() === DEMO_EMAIL) { setErr("La cuenta de prueba no admite cambiar la contraseña."); return }
+    setLoading(true); setErr(""); setMsg("")
+    const { error } = await onResetPassword(email.trim())
+    const code = (error as FirebaseError | null)?.code
+    if (error && code !== "auth/user-not-found") setErr(FIREBASE_ERRORS[code ?? ""] ?? error.message)
+    else setMsg("Si hay una cuenta con ese email, te llegará un enlace para elegir una contraseña nueva. Mira también en spam.")
+    setLoading(false)
+  }
+
+  const goTo = (next: AuthMode) => {
+    setMode(next)
     setErr("")
     setMsg("")
   }
+  const toggleMode = () => goTo(mode === "login" ? "signup" : "login")
 
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex items-center justify-center p-4">
@@ -66,7 +82,7 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
         </div>
         <div className="glass-panel rounded-3xl p-7">
           <h2 className="text-base font-semibold mb-6">
-            {mode === "login" ? "Iniciar sesión" : "Crear cuenta"}
+            {mode === "login" ? "Iniciar sesión" : mode === "signup" ? "Crear cuenta" : "Recuperar contraseña"}
           </h2>
           <div className="mb-4">
             <label className="block text-xs text-white/60 mb-1">Email</label>
@@ -74,17 +90,26 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
               placeholder="tu@email.com"
               className="glass-input rounded-xl w-full px-3 py-2 text-sm" />
           </div>
-          <div className="mb-6">
-            <label className="block text-xs text-white/60 mb-1">Contraseña</label>
-            <input type="password" value={password} onChange={(e) => setPass(e.target.value)}
-              placeholder="••••••••" onKeyDown={(e) => e.key === "Enter" && handle()}
-              className="glass-input rounded-xl w-full px-3 py-2 text-sm" />
-          </div>
+          {mode === "reset" ? (
+            <p className="mb-6 text-xs text-white/60">Te enviaremos un enlace para elegir una contraseña nueva.</p>
+          ) : (
+            <div className="mb-6">
+              <label className="block text-xs text-white/60 mb-1">Contraseña</label>
+              <input type="password" value={password} onChange={(e) => setPass(e.target.value)}
+                placeholder="••••••••" onKeyDown={(e) => e.key === "Enter" && handle()}
+                className="glass-input rounded-xl w-full px-3 py-2 text-sm" />
+              {mode === "login" && (
+                <button type="button" onClick={() => goTo("reset")} className="mt-2 text-xs text-cyan-300 hover:underline">
+                  ¿Olvidaste la contraseña?
+                </button>
+              )}
+            </div>
+          )}
           {err && <p className="text-red-400 text-xs mb-4">{err}</p>}
           {msg && <p className="text-emerald-400 text-xs mb-4">{msg}</p>}
           <button onClick={handle} disabled={loading}
             className={`liquid-button rounded-xl font-semibold text-[#04202a] w-full py-2.5 text-sm transition-opacity mb-4 ${loading ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
-            {loading ? "Cargando..." : mode === "login" ? "Entrar" : "Registrarse"}
+            {loading ? "Cargando..." : mode === "login" ? "Entrar" : mode === "signup" ? "Registrarse" : "Enviar enlace"}
           </button>
           {mode === "login" && (
             <button onClick={handleTester} disabled={loading}
@@ -92,12 +117,18 @@ const AuthPage = ({ onSignIn, onSignUp }: AuthPageProps) => {
               Entrar como Tester
             </button>
           )}
+          {mode === "reset" ? (
+            <p className="text-center text-xs text-white/60">
+              <button onClick={() => goTo("login")} className="text-cyan-300 hover:underline">Volver a iniciar sesión</button>
+            </p>
+          ) : (
           <p className="text-center text-xs text-white/60">
             {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
             <button onClick={toggleMode} className="text-cyan-300 hover:underline">
               {mode === "login" ? "Regístrate" : "Inicia sesión"}
             </button>
           </p>
+          )}
         </div>
       </div>
     </div>

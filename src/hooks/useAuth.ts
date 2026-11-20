@@ -3,6 +3,7 @@ import {
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut as firebaseSignOut,
   type User,
 } from "firebase/auth"
@@ -39,7 +40,17 @@ export const useAuth = () => {
     }
   }
 
+  const resetPassword = async (email: string): Promise<AuthResult> => {
+    try {
+      auth.languageCode = "es"
+      await sendPasswordResetEmail(auth, email)
+      return { error: null }
+    } catch (e) {
+      return { error: e as Error }
+    }
+  }
+
   const signOut = () => firebaseSignOut(auth)
 
-  return { user, loading, signUp, signIn, signOut }
+  return { user, loading, signUp, signIn, signOut, resetPassword }
 }
