@@ -28,13 +28,20 @@ const dayMs = (date: string) => Date.parse(`${date.slice(0, 10)}T00:00:00Z`)
 const sameAmount = (a: number, b: number) => Math.abs(Number(a) - Number(b)) < 0.005
 const isVentajonConcept = (c: string) => /ventaj[oó]n/i.test(c)
 
-// Categoría propuesta (solo de gasto, no de ahorro): lo que elegiste antes para ese concepto; si no,
-// la de las reglas de serie (Mercadona -> "Alimentación") si tienes una categoría con ese nombre
+// Categoría propuesta (solo de gasto, no de ahorro): lo que elegiste antes para ese concepto; si no, una
+// categoría tuya cuyo nombre aparezca en el concepto; si no, la de las reglas de serie (Mercadona -> "Alimentación") si tienes una categoría con ese nombre
 export function suggestFor(concept: string, memory: CategoryMemory, categories: BudgetCategory[]): string | null {
   const spendable = categories.filter((c) => !c.savings)
   const remembered = memory[conceptKey(concept)]
   if (remembered === SKIP) return SKIP
   if (remembered && spendable.some((c) => c.id === remembered)) return remembered
+  // Una categoría tuya cuyo nombre sale en el concepto («Multitienda» en «MULTITIENDA DIANA»); la más larga gana
+  const key = ` ${conceptKey(concept)} `
+  const byName = spendable
+    .map((c) => ({ c, name: conceptKey(c.name) }))
+    .filter(({ name }) => name.length >= 3 && key.includes(` ${name} `))
+    .sort((x, y) => y.name.length - x.name.length)[0]
+  if (byName) return byName.c.id
   const guess = categorize(concept, false)
   const match = resolveCategory(guess, spendable) ?? resolveCategory(`${guess}s`, spendable) // "Otro" -> "Otros"
   return match?.id ?? null

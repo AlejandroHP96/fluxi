@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react"
 import { Undo2, Check, SkipForward, AlertTriangle, Plus } from "lucide-react"
 import { conceptKey } from "../../utils/categorize"
 import { fmt } from "../../utils/formatters"
-import { SKIP, type ImportItem } from "../../utils/importQueue"
+import { SKIP, suggestFor, type ImportItem } from "../../utils/importQueue"
 import { newCategoryId } from "../../utils/month"
 import type { BudgetApi } from "../../hooks/useBudget"
 import { CategoryChip } from "./CategoryChip"
@@ -25,7 +25,7 @@ interface ImportReviewProps {
 }
 
 export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: ImportReviewProps) => {
-  const { addExpense, deleteExpense, remember, categories, saveCategories } = budget
+  const { addExpense, deleteExpense, remember, categories, saveCategories, memory } = budget
   const spendCats = categories.filter((c) => !c.savings)
   const [index, setIndex] = useState(0)
   const [decisions, setDecisions] = useState<Decision[]>([])
@@ -91,7 +91,10 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
     setDecisions(next)
     if (index + 1 >= queue.length) return onFinish(next)
     const n = queue[index + 1]
-    load(index + 1, n.concept, n.suggestion)
+    // Se recalcula con lo aprendido en esta misma importación (elecciones y categorías nuevas): si acabas de
+    // crear «Multitienda», el siguiente «MULTITIENDA DIANA» ya sale con ella
+    const learned = { ...memory, [conceptKey(item.concept)]: choice }
+    load(index + 1, n.concept, n.duplicateOf ? SKIP : suggestFor(n.concept, learned, categories))
     ;(document.activeElement as HTMLElement | null)?.blur?.()
   }
 
