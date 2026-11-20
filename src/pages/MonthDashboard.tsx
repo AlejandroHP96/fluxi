@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, Plus } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
 import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
-import { finishBankConnection, takeBankRedirect } from "../utils/bankClient"
+import { disconnectBank, finishBankConnection, takeBankRedirect } from "../utils/bankClient"
 import type { Expense } from "../types/budget"
 import { DEMO_EMAIL } from "../constants/demo"
 import { AppHeader } from "../components/budget/AppHeader"
@@ -239,6 +239,11 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
             onSave={saveCategories}
             onSaveFixedExpenses={saveFixedExpenses}
             onReassign={reassignExpenses}
+            onResetAll={async () => {
+              // Primero se revoca el acceso al banco (si falla, se borra igual)
+              if (budget.bank) await disconnectBank(budget.bank)
+              return budget.resetAll()
+            }}
             onClose={closeSettings}
           />
         </Suspense>

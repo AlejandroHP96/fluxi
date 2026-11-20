@@ -146,10 +146,22 @@ const useFirestoreBudget = (userId: string | undefined) => {
   const saveBank = (b: BankSession | null) =>
     run(() => setDoc(settingsRef(), { userId, bank: b ?? deleteField() }, { merge: true }))
 
+  // Empezar de cero: borra todos los gastos y el documento de ajustes (categorías, nóminas, fijos, memoria y banco)
+  const resetAll = () =>
+    run(async () => {
+      const ids = expenses.map((e) => e.id)
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = writeBatch(db)
+        for (const id of ids.slice(i, i + 400)) batch.delete(doc(db, "expenses", id))
+        await batch.commit()
+      }
+      await deleteDoc(settingsRef())
+    })
+
   return {
     expenses, categories, fixedExpenses, income, memory, bank, loading, error,
     addExpense, updateExpense, deleteExpense, reassignExpenses,
-    setIncome, saveCategories, saveFixedExpenses, remember, saveBank,
+    setIncome, saveCategories, saveFixedExpenses, remember, saveBank, resetAll,
   }
 }
 
@@ -288,6 +300,14 @@ const useDemoBudget = (active: boolean): BudgetApi => {
     // La demo no conecta bancos
     bank: null,
     saveBank: async () => true,
+    resetAll: () => {
+      setExpenses([])
+      setCategories([])
+      setFixedExpenses([])
+      setIncomeMap({})
+      setMemory({})
+      return ok()
+    },
   }
 }
 

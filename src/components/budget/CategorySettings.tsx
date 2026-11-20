@@ -17,8 +17,11 @@ interface CategorySettingsProps {
   onSave: (list: BudgetCategory[]) => Promise<boolean>
   onSaveFixedExpenses?: (list: FixedExpense[]) => Promise<boolean>
   onReassign: (ids: string[], categoryId: string) => Promise<boolean>
+  onResetAll?: () => Promise<boolean>
   onClose: () => void
 }
+
+const RESET_WORD = "BORRAR"
 
 interface PendingDelete {
   row: DraftCat
@@ -34,6 +37,7 @@ export const CategorySettings = ({
   onSave,
   onSaveFixedExpenses,
   onReassign,
+  onResetAll,
   onClose,
 }: CategorySettingsProps) => {
   const [tab, setTab] = useState<"categories" | "fixed">(initialTab)
@@ -43,6 +47,8 @@ export const CategorySettings = ({
   const [moves, setMoves] = useState<Array<{ from: string; to: string }>>([]) // categoría borrada -> destino
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [resetting, setResetting] = useState(false) // panel de confirmación de «Borrar todos mis datos»
+  const [resetText, setResetText] = useState("")
 
   const fixedTotal = draftFixedTotal(fixedDraft)
 
@@ -113,6 +119,15 @@ export const CategorySettings = ({
       if (ids.length && list.some((c) => c.id === m.to)) await onReassign(ids, m.to)
     }
     onClose()
+  }
+
+  const resetAll = async () => {
+    if (!onResetAll || resetText.trim().toUpperCase() !== RESET_WORD) return
+    setError(null)
+    setBusy(true)
+    if (await onResetAll()) return onClose()
+    setBusy(false)
+    setError("No se pudieron borrar los datos. Inténtalo de nuevo.")
   }
 
   const targets = pending ? draft.filter((d) => d.id !== pending.row.id && d.name.trim()) : []
@@ -228,6 +243,44 @@ export const CategorySettings = ({
             </div>
           )}
 
+          {resetting && (
+            <div className="space-y-3 rounded-2xl border border-red-400/35 bg-red-500/[0.1] p-4 text-sm text-red-50">
+              <p>
+                Se borrarán <strong>todos tus gastos</strong>, las categorías, las nóminas, los gastos fijos, las categorías recordadas y la
+                conexión con el banco. No se puede deshacer.
+              </p>
+              <label className="block">
+                <span className="text-white/75">Escribe {RESET_WORD} para confirmar</span>
+                <input
+                  value={resetText}
+                  onChange={(e) => setResetText(e.target.value)}
+                  autoComplete="off"
+                  className="glass-input mt-1.5 w-full rounded-xl px-3 py-2.5 text-base"
+                />
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void resetAll()}
+                  disabled={busy || resetText.trim().toUpperCase() !== RESET_WORD}
+                  className="rounded-xl bg-red-500/90 px-4 py-2.5 font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-50"
+                >
+                  {busy ? "Borrando…" : "Borrar todo"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetting(false)
+                    setResetText("")
+                  }}
+                  className="rounded-xl border border-white/25 px-4 py-2.5 font-medium text-white/85 transition-colors hover:bg-white/10"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
           {error && <p className="text-sm text-red-300">{error}</p>}
 
           <div className="flex items-center gap-2">
@@ -247,6 +300,19 @@ export const CategorySettings = ({
               {busy ? "Guardando…" : "Guardar cambios"}
             </button>
           </div>
+
+          {onResetAll && !resetting && (
+            <button
+              type="button"
+              onClick={() => {
+                setPending(null)
+                setResetting(true)
+              }}
+              className="w-full rounded-lg py-1.5 text-center text-xs font-medium text-red-300/80 transition-colors hover:text-red-200"
+            >
+              Borrar todos mis datos
+            </button>
+          )}
         </div>
       </div>
     </div>,

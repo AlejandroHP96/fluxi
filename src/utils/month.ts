@@ -1,4 +1,4 @@
-import type { BudgetCategory, EnvelopeSummary, Expense, FixedExpense, MonthStatus, MonthSummary } from "../types/budget.js"
+import type { BudgetCategory, EnvelopeSummary, Expense, FixedExpense, MonthStatus, MonthSummary } from "../types/budget"
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
