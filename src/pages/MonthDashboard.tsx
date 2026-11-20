@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { Suspense, lazy, useMemo, useState } from "react"
 import { AlertTriangle, Plus } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
 import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
@@ -9,10 +9,19 @@ import { BentoKpis } from "../components/budget/BentoKpis"
 import { MonthCharts } from "../components/budget/MonthCharts"
 import { EnvelopesGrid } from "../components/budget/EnvelopesGrid"
 import { ExpenseList } from "../components/budget/ExpenseList"
-import { ExpenseModal } from "../components/budget/ExpenseModal"
-import { ImportWizard } from "../components/budget/ImportWizard"
-import { CategorySettings } from "../components/budget/CategorySettings"
-import { FirstSetup } from "../components/budget/FirstSetup"
+
+const ExpenseModal = lazy(() =>
+  import("../components/budget/ExpenseModal").then((m) => ({ default: m.ExpenseModal }))
+)
+const ImportWizard = lazy(() =>
+  import("../components/budget/ImportWizard").then((m) => ({ default: m.ImportWizard }))
+)
+const CategorySettings = lazy(() =>
+  import("../components/budget/CategorySettings").then((m) => ({ default: m.CategorySettings }))
+)
+const FirstSetup = lazy(() =>
+  import("../components/budget/FirstSetup").then((m) => ({ default: m.FirstSetup }))
+)
 
 interface MonthDashboardProps {
   email: string | null
@@ -80,19 +89,23 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         {header}
         <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
           {errorBanner}
-          <FirstSetup
-            month={month}
-            onSubmit={async (cats, amount) => (await saveCategories(cats)) && (await setIncome(month, amount))}
-          />
+          <Suspense fallback={null}>
+            <FirstSetup
+              month={month}
+              onSubmit={async (cats, amount) => (await saveCategories(cats)) && (await setIncome(month, amount))}
+            />
+          </Suspense>
+          {importing && (
+            <Suspense fallback={null}>
+              <ImportWizard
+                budget={budget}
+                viewMonth={month}
+                onManageCategories={() => openSettings("categories")}
+                onClose={() => setImporting(false)}
+              />
+            </Suspense>
+          )}
         </main>
-        {importing && (
-          <ImportWizard
-            budget={budget}
-            viewMonth={month}
-            onManageCategories={() => openSettings("categories")}
-            onClose={() => setImporting(false)}
-          />
-        )}
       </div>
     )
   }
@@ -165,41 +178,47 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       </div>
 
       {importing && (
-        <ImportWizard
-          budget={budget}
-          viewMonth={month}
-          onManageCategories={() => openSettings("categories")}
-          onClose={(imported) => {
-            setImporting(false)
-            if (imported) setMonth(imported)
-          }}
-        />
+        <Suspense fallback={null}>
+          <ImportWizard
+            budget={budget}
+            viewMonth={month}
+            onManageCategories={() => openSettings("categories")}
+            onClose={(imported) => {
+              setImporting(false)
+              if (imported) setMonth(imported)
+            }}
+          />
+        </Suspense>
       )}
 
       {settingsTab && (
-        <CategorySettings
-          categories={categories}
-          expenses={expenses}
-          fixedExpenses={fixedExpenses}
-          initialTab={settingsTab}
-          onSave={saveCategories}
-          onSaveFixedExpenses={saveFixedExpenses}
-          onReassign={reassignExpenses}
-          onClose={closeSettings}
-        />
+        <Suspense fallback={null}>
+          <CategorySettings
+            categories={categories}
+            expenses={expenses}
+            fixedExpenses={fixedExpenses}
+            initialTab={settingsTab}
+            onSave={saveCategories}
+            onSaveFixedExpenses={saveFixedExpenses}
+            onReassign={reassignExpenses}
+            onClose={closeSettings}
+          />
+        </Suspense>
       )}
 
       {modal && (
-        <ExpenseModal
-          expense={modal.kind === "edit" ? modal.expense : null}
-          month={month}
-          categories={categories}
-          onManageCategories={() => openSettings("categories")}
-          defaultDate={defaultDate}
-          onSave={async (data) => (modal.kind === "edit" ? updateExpense(modal.expense.id, data) : (await addExpense(data)) !== null)}
-          onDelete={modal.kind === "edit" ? () => deleteExpense(modal.expense.id) : undefined}
-          onClose={closeModal}
-        />
+        <Suspense fallback={null}>
+          <ExpenseModal
+            expense={modal.kind === "edit" ? modal.expense : null}
+            month={month}
+            categories={categories}
+            onManageCategories={() => openSettings("categories")}
+            defaultDate={defaultDate}
+            onSave={async (data) => (modal.kind === "edit" ? updateExpense(modal.expense.id, data) : (await addExpense(data)) !== null)}
+            onDelete={modal.kind === "edit" ? () => deleteExpense(modal.expense.id) : undefined}
+            onClose={closeModal}
+          />
+        </Suspense>
       )}
     </div>
   )

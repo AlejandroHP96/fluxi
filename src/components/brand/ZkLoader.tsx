@@ -8,8 +8,8 @@ import { ZK_VIEWBOX } from "./ZkLogo"
 // Si ese logo no está visible (móvil, sin barra lateral), se desvanece en el centro.
 
 const LOGO_SIZE = 180
-const MIN_ASSEMBLE_MS = 1700
-const FLY_MS = 1050
+const MIN_ASSEMBLE_MS = 700
+const FLY_MS = 600
 
 interface Target {
   x: number

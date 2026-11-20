@@ -6,19 +6,52 @@ service cloud.firestore {
       return request.auth != null && data.userId == request.auth.uid;
     }
 
+    // Campos de un gasto: tipos y tamaños acotados (la cuenta demo es pública, así nadie mete basura enorme)
+    function okAmount(d) { return d.amount is number && d.amount > 0 && d.amount < 1000000; }
+    function okConcept(d) { return d.concept is string && d.concept.size() <= 200; }
+    function okDate(d) { return d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
+    function okCategory(d) { return d.category is string && d.category.size() <= 100; }
+    function validExpense(d) {
+      return okAmount(d) && okConcept(d) && okDate(d) && okCategory(d);
+    }
+    // Al editar solo se validan los campos que cambian: un gasto antiguo con datos raros sigue siendo editable
+    function validChanges(d, changed) {
+      return (!changed.hasAny(['amount']) || okAmount(d))
+        && (!changed.hasAny(['concept']) || okConcept(d))
+        && (!changed.hasAny(['date']) || okDate(d))
+        && (!changed.hasAny(['category']) || okCategory(d));
+    }
+
     // Gastos apuntados a mano o importados del CSV de Revolut
     match /expenses/{id} {
       allow read, delete: if owns(resource.data);
       allow create: if owns(request.resource.data)
-        && request.resource.data.amount is number && request.resource.data.amount > 0
-        && request.resource.data.date is string && request.resource.data.concept is string;
+        && request.resource.data.keys().hasOnly(['userId', 'amount', 'concept', 'category', 'date', 'createdAt'])
+        && validExpense(request.resource.data);
+      // Solo se pueden cambiar estos campos (los gastos antiguos pueden traer otros y se respetan)
       allow update: if owns(resource.data) && owns(request.resource.data)
-        && request.resource.data.amount is number && request.resource.data.amount > 0;
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date'])
+        && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys());
     }
 
-    // Presupuesto mensual (history) y categorías recordadas al importar (memory)
+    // Reparto (categories), nóminas por mes (income), gastos fijos y categorías recordadas al importar (memory)
+    function validBudget(d) {
+      return d.userId == request.auth.uid
+        && (!('categories' in d) || (d.categories is list && d.categories.size() <= 50))
+        && (!('fixedExpenses' in d) || (d.fixedExpenses is list && d.fixedExpenses.size() <= 50))
+        && (!('income' in d) || (d.income is map && d.income.size() <= 600))
+        && (!('memory' in d) || (d.memory is map && d.memory.size() <= 3000));
+    }
+
     match /budgets/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory'])
+        && validBudget(request.resource.data);
+      allow update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory'])
+        && validBudget(request.resource.data);
+      allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
     // El resto (colecciones de la versión anterior: transactions, transfers, accounts, goals, finance)
