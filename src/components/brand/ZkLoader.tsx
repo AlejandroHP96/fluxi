@@ -63,7 +63,8 @@ export function ZkLoader({ children, isLoading = false }: { children: ReactNode;
     return () => clearTimeout(t)
   }, [phase])
 
-  if (phase === "done") return <>{children}</>
+  // Mismo envoltorio que durante la animación: si cambiara, React volvería a montar toda la app (y perdería su estado)
+  if (phase === "done") return <><div>{children}</div></>
 
   const isFlying = phase === "flying"
   const focusX = target ? target.x + target.size / 2 : window.innerWidth / 2
