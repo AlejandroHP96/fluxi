@@ -17,6 +17,8 @@ service cloud.firestore {
     function okConcept(d) { return d.concept is string && d.concept.size() <= 200; }
     function okDate(d) { return d.date is string && d.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'); }
     function okCategory(d) { return d.category is string && d.category.size() <= 100; }
+    // Devoluciones del gasto (compras en conjunto): lista acotada
+    function okRefunds(d) { return d.refunds is list && d.refunds.size() <= 30; }
     function validExpense(d) {
       return okAmount(d) && okConcept(d) && okDate(d) && okCategory(d);
     }
@@ -25,7 +27,8 @@ service cloud.firestore {
       return (!changed.hasAny(['amount']) || okAmount(d))
         && (!changed.hasAny(['concept']) || okConcept(d))
         && (!changed.hasAny(['date']) || okDate(d))
-        && (!changed.hasAny(['category']) || okCategory(d));
+        && (!changed.hasAny(['category']) || okCategory(d))
+        && (!changed.hasAny(['refunds']) || okRefunds(d));
     }
 
     // Gastos apuntados a mano o importados del CSV de Revolut
@@ -37,28 +40,31 @@ service cloud.firestore {
         && validExpense(request.resource.data);
       // Solo se pueden cambiar estos campos (los gastos antiguos pueden traer otros y se respetan)
       allow update: if owns(resource.data) && owns(request.resource.data) && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date', 'refunds'])
         && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys());
     }
 
     // Reparto (categories), nóminas por mes (income), gastos fijos, categorías recordadas al importar (memory)
-    // y la sesión del banco de Enable Banking (bank)
+    // , la sesión del banco de Enable Banking (bank) y la cartera de ahorros (wallet: saldo inicial y movimientos)
     function validBudget(d) {
       return d.userId == request.auth.uid
         && (!('categories' in d) || (d.categories is list && d.categories.size() <= 50))
         && (!('fixedExpenses' in d) || (d.fixedExpenses is list && d.fixedExpenses.size() <= 50))
         && (!('income' in d) || (d.income is map && d.income.size() <= 600))
         && (!('memory' in d) || (d.memory is map && d.memory.size() <= 3000))
-        && (!('bank' in d) || d.bank == null || (d.bank is map && d.bank.keys().hasOnly(['sessionId', 'validUntil', 'bankName', 'accounts'])));
+        && (!('bank' in d) || d.bank == null || (d.bank is map && d.bank.keys().hasOnly(['sessionId', 'validUntil', 'bankName', 'accounts'])))
+        && (!('wallet' in d) || (d.wallet is map && d.wallet.keys().hasOnly(['initial', 'movements'])
+              && (!('initial' in d.wallet) || d.wallet.initial is number)
+              && (!('movements' in d.wallet) || (d.wallet.movements is list && d.wallet.movements.size() <= 2000))));
     }
 
     match /budgets/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null && request.auth.uid == uid && notDemo()
-        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank'])
+        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank', 'wallet'])
         && validBudget(request.resource.data);
       allow update: if request.auth != null && request.auth.uid == uid && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank', 'wallet'])
         && validBudget(request.resource.data);
       allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
     }

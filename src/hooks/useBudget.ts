@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react"
 import {
-  addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch,
+  addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from "firebase/firestore"
+import type { Transaction } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
-import type { BudgetCategory, Expense, FixedExpense, NewExpense } from "../types/budget"
+import type { BudgetCategory, Expense, FixedExpense, NewExpense, Refund, Wallet } from "../types/budget"
+import { syncRefundMoves } from "../utils/wallet"
 import type { CategoryMemory } from "../utils/importQueue"
 import type { BankSession } from "../utils/bankClient"
 
@@ -25,6 +27,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
   const [income, setIncomeMap] = useState<Record<string, number>>({})
   const [memory, setMemory] = useState<CategoryMemory>({})
   const [bank, setBank] = useState<BankSession | null>(null)
+  const [wallet, setWallet] = useState<Wallet | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,6 +39,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
     setIncomeMap({})
     setMemory({})
     setBank(null)
+    setWallet(null)
     setError(null)
     setLoading(true)
     if (!userId) return
@@ -61,6 +65,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
             concept: data.concept,
             category: data.category,
             date: data.date,
+            ...(Array.isArray(data.refunds) && data.refunds.length ? { refunds: data.refunds as Refund[] } : {}),
             _created: data.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER, // recién creado (pendiente) = el más nuevo
           }
         })
@@ -78,6 +83,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
       setIncomeMap((data?.income as Record<string, number> | undefined) ?? {})
       setMemory((data?.memory as CategoryMemory | undefined) ?? {})
       setBank((data?.bank as BankSession | undefined) ?? null)
+      setWallet((data?.wallet as Wallet | undefined) ?? null)
       markLoaded("settings")
     }, onErr("settings"))
 
@@ -113,7 +119,40 @@ const useFirestoreBudget = (userId: string | undefined) => {
   const updateExpense = (id: string, e: NewExpense) =>
     run(() => updateDoc(doc(db, "expenses", id), { ...e, amount: Math.abs(Number(e.amount)) }))
 
-  const deleteExpense = (id: string) => run(() => deleteDoc(doc(db, "expenses", id)))
+  // Gasto y cartera en una transacción: se leen del servidor en ese momento, así la cartera no se calcula
+  // con un estado desfasado (ni se pisa el saldo si los ajustes aún no habían cargado)
+  const withWallet = (expenseId: string, change: (tx: Transaction, e: Expense, w: Wallet | null) => Wallet | null) =>
+    run(() =>
+      runTransaction(db, async (tx) => {
+        const snap = await tx.get(doc(db, "expenses", expenseId))
+        const settings = await tx.get(settingsRef())
+        if (!snap.exists()) throw new Error("Ese gasto ya no existe")
+        const e = { id: snap.id, ...snap.data() } as Expense
+        const next = change(tx, e, (settings.data()?.wallet as Wallet | undefined) ?? null)
+        if (next) tx.set(settingsRef(), { userId, wallet: next }, { merge: true })
+      })
+    )
+
+  // Al borrar un gasto se quitan también de la cartera los movimientos de sus devoluciones
+  const deleteExpense = (id: string) => {
+    const e = expenses.find((x) => x.id === id)
+    if (!e?.refunds?.some((r) => r.toWallet)) return run(() => deleteDoc(doc(db, "expenses", id)))
+    return withWallet(id, (tx, fresh, w) => {
+      tx.delete(doc(db, "expenses", id))
+      return fresh.refunds?.some((r) => r.toWallet) ? syncRefundMoves(w, fresh.refunds, [], fresh.concept) : null
+    })
+  }
+
+  // Devoluciones de un gasto (lista completa). Las que van a la cartera se reflejan en ella en la misma transacción
+  const saveRefunds = (e: Expense, refunds: Refund[]) =>
+    withWallet(e.id, (tx, fresh, w) => {
+      tx.update(doc(db, "expenses", e.id), { refunds })
+      const old = fresh.refunds ?? []
+      return [...old, ...refunds].some((r) => r.toWallet) ? syncRefundMoves(w, old, refunds, fresh.concept) : null
+    })
+
+  // Cartera de ahorros completa (saldo inicial y movimientos)
+  const saveWallet = (w: Wallet) => run(() => setDoc(settingsRef(), { userId, wallet: w }, { merge: true }))
 
   // Mover gastos a otra categoría (p. ej. al borrar una categoría)
   const reassignExpenses = (ids: string[], categoryId: string) =>
@@ -166,8 +205,8 @@ const useFirestoreBudget = (userId: string | undefined) => {
     })
 
   return {
-    expenses, categories, fixedExpenses, income, memory, bank, loading, error,
-    addExpense, updateExpense, deleteExpense, reassignExpenses,
+    expenses, categories, fixedExpenses, income, memory, bank, wallet, loading, error,
+    addExpense, updateExpense, deleteExpense, reassignExpenses, saveRefunds, saveWallet,
     setIncome, saveCategories, saveFixedExpenses, remember, saveBank, resetAll,
   }
 }
@@ -245,6 +284,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
   const [income, setIncomeMap] = useState<Record<string, number>>(initial.income)
   const [memory, setMemory] = useState<CategoryMemory>({})
+  const [wallet, setWallet] = useState<Wallet | null>(null)
 
   // Al entrar de nuevo en la demo se parte de los datos de ejemplo (durante el render, sin un fotograma con lo anterior)
   const [wasActive, setWasActive] = useState(active)
@@ -257,6 +297,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       setFixedExpenses([])
       setIncomeMap(d.income)
       setMemory({})
+      setWallet(null)
     }
   }
 
@@ -264,7 +305,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
   const ok = async () => true
 
   return {
-    expenses, categories, fixedExpenses, income, memory, loading: false, error: null,
+    expenses, categories, fixedExpenses, income, memory, wallet, loading: false, error: null,
     addExpense: async (e: NewExpense) => {
       const id = newCategoryId()
       setExpenses((l) => sortList([{ ...e, amount: Math.abs(Number(e.amount)), id, userId: DEMO_UID }, ...l]))
@@ -275,7 +316,19 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       return ok()
     },
     deleteExpense: (id: string) => {
+      const e = expenses.find((x) => x.id === id)
+      if (e?.refunds?.some((r) => r.toWallet)) setWallet(syncRefundMoves(wallet, e.refunds, [], e.concept))
       setExpenses((l) => l.filter((x) => x.id !== id))
+      return ok()
+    },
+    saveRefunds: (stale: Expense, refunds: Refund[]) => {
+      const e = expenses.find((x) => x.id === stale.id) ?? stale // el actual, no la copia de cuando se abrió
+      if ([...(e.refunds ?? []), ...refunds].some((r) => r.toWallet)) setWallet(syncRefundMoves(wallet, e.refunds ?? [], refunds, e.concept))
+      setExpenses((l) => l.map((x) => (x.id === e.id ? { ...x, refunds } : x)))
+      return ok()
+    },
+    saveWallet: (w: Wallet) => {
+      setWallet(w)
       return ok()
     },
     reassignExpenses: (ids: string[], categoryId: string) => {
@@ -313,6 +366,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       setFixedExpenses([])
       setIncomeMap({})
       setMemory({})
+      setWallet(null)
       return ok()
     },
   }

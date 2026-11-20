@@ -1,4 +1,4 @@
-import type { BudgetCategory, EnvelopeSummary, Expense, FixedExpense, MonthStatus, MonthSummary } from "../types/budget"
+import { netAmount, type BudgetCategory, type EnvelopeSummary, type Expense, type FixedExpense, type MonthStatus, type MonthSummary } from "../types/budget"
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
@@ -62,8 +62,8 @@ export function summarizeMonth(
   let uncategorized = 0
   for (const e of inMonth) {
     const cat = resolveCategory(e.category, categories)
-    if (cat) spentBy.set(cat.id, (spentBy.get(cat.id) || 0) + Number(e.amount))
-    else uncategorized += Number(e.amount)
+    if (cat) spentBy.set(cat.id, (spentBy.get(cat.id) || 0) + netAmount(e))
+    else uncategorized += netAmount(e)
   }
 
   const rawIncome = income ?? 0
@@ -90,7 +90,7 @@ export function summarizeMonth(
   const savings = categories.filter((c) => c.savings).map(envelope)
   const envelopes = categories.filter((c) => !c.savings).map(envelope)
   const saved = savings.reduce((a, s) => a + s.allocated, 0)
-  const spent = inMonth.reduce((a, e) => a + Number(e.amount), 0)
+  const spent = inMonth.reduce((a, e) => a + netAmount(e), 0)
   const spendable = income !== null ? (rawIncome - totalFixed) - saved : 0
   const available = spendable - spent
   const pctSpent = spendable > 0 ? (spent / spendable) * 100 : 0

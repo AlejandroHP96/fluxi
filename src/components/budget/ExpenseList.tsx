@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react"
-import { Plus, Search, X } from "lucide-react"
+import { Plus, Search, Undo2, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { resolveCategory, todayKey } from "../../utils/month"
-import type { BudgetCategory, Expense } from "../../types/budget"
+import { netAmount, type BudgetCategory, type Expense } from "../../types/budget"
 import { catColor, dayLabel } from "./helpers"
 
 interface ExpenseListProps {
@@ -42,11 +42,11 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
     return [...map.entries()].map(([date, items]) => ({
       date,
       items,
-      total: items.reduce((a, e) => a + e.amount, 0),
+      total: items.reduce((a, e) => a + netAmount(e), 0),
     }))
   }, [filtered])
 
-  const totalFilteredAmount = useMemo(() => filtered.reduce((a, e) => a + e.amount, 0), [filtered])
+  const totalFilteredAmount = useMemo(() => filtered.reduce((a, e) => a + netAmount(e), 0), [filtered])
   const today = todayKey()
 
   return (
@@ -167,9 +167,18 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
                           <span className="block truncate text-sm font-medium text-white/95">{e.concept}</span>
                           <span className="block text-xs text-white/50">{cat?.name ?? "Sin categoría"}</span>
                         </span>
-                        <span className="shrink-0 text-sm font-semibold tabular-nums text-white/90">
-                          {fmt(e.amount)}
-                        </span>
+                        {e.refunds?.length ? (
+                          // Con devoluciones: lo que te ha costado y, debajo, el importe original tachado
+                          <span className="shrink-0 text-right">
+                            <span className="flex items-center justify-end gap-1 text-sm font-semibold tabular-nums text-white/90">
+                              <Undo2 className="h-3 w-3 text-emerald-300" />
+                              {fmt(netAmount(e))}
+                            </span>
+                            <span className="block text-[11px] tabular-nums text-white/40 line-through">{fmt(e.amount)}</span>
+                          </span>
+                        ) : (
+                          <span className="shrink-0 text-sm font-semibold tabular-nums text-white/90">{fmt(e.amount)}</span>
+                        )}
                       </button>
                     </li>
                   )

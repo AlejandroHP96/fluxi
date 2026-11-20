@@ -10,6 +10,7 @@ import { MonthNav } from "../components/budget/MonthNav"
 import { BentoKpis } from "../components/budget/BentoKpis"
 import { MonthCharts } from "../components/budget/MonthCharts"
 import { EnvelopesGrid } from "../components/budget/EnvelopesGrid"
+import { WalletCard } from "../components/budget/WalletCard"
 import { ExpenseList } from "../components/budget/ExpenseList"
 
 const ExpenseModal = lazy(() =>
@@ -191,6 +192,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
               categories={categories}
               onEdit={() => openSettings("categories")}
             />
+            <WalletCard wallet={budget.wallet} onSave={budget.saveWallet} />
           </div>
           <div className="lg:col-span-5 lg:sticky lg:top-20">
             <ExpenseList
@@ -252,13 +254,18 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       {modal && (
         <Suspense fallback={null}>
           <ExpenseModal
-            expense={modal.kind === "edit" ? modal.expense : null}
+            expense={modal.kind === "edit" ? (expenses.find((x) => x.id === modal.expense.id) ?? modal.expense) : null}
             month={month}
             categories={categories}
             onManageCategories={() => openSettings("categories")}
             defaultDate={defaultDate}
             onSave={async (data) => (modal.kind === "edit" ? updateExpense(modal.expense.id, data) : (await addExpense(data)) !== null)}
             onDelete={modal.kind === "edit" ? () => deleteExpense(modal.expense.id) : undefined}
+            onSaveRefunds={
+              modal.kind === "edit"
+                ? (r) => budget.saveRefunds(modal.expense, r)
+                : undefined
+            }
             onClose={closeModal}
           />
         </Suspense>

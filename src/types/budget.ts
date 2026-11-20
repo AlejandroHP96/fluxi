@@ -8,7 +8,39 @@ export interface Expense {
   concept: string
   category: string // id de BudgetCategory (los gastos antiguos pueden traer el nombre: se resuelve por nombre)
   date: string // "YYYY-MM-DD"
+  refunds?: Refund[] // devoluciones de este gasto (compras en conjunto que te devuelven)
 }
+
+// Dinero que te devuelven de un gasto. Si vuelve al mes, resta de lo gastado en su categoría;
+// si va a la cartera de ahorros, el gasto cuenta entero y el dinero entra en la cartera
+export interface Refund {
+  id: string
+  amount: number // positivo
+  note: string // quién o por qué («Ana», «Bizum cena»)
+  date: string // "YYYY-MM-DD"
+  toWallet: boolean
+}
+
+// Cartera de ahorros aparte de los sobres: saldo inicial puesto a mano y movimientos (+ entra, − sale)
+export interface WalletMove {
+  id: string
+  amount: number // con signo
+  note: string
+  date: string // "YYYY-MM-DD"
+  refundId?: string // si viene de la devolución de un gasto (se gestiona desde el gasto)
+}
+
+export interface Wallet {
+  initial: number
+  movements: WalletMove[]
+}
+
+export const walletBalance = (w: Wallet | null | undefined) =>
+  w ? Math.round((Number(w.initial) + w.movements.reduce((a, m) => a + Number(m.amount), 0)) * 100) / 100 : 0
+
+// Lo que de verdad te ha costado un gasto: su importe menos lo devuelto al mes (no lo que fue a la cartera)
+export const netAmount = (e: Pick<Expense, "amount" | "refunds">) =>
+  Math.max(0, Number(e.amount) - (e.refunds ?? []).reduce((a, r) => a + (r.toWallet ? 0 : Number(r.amount)), 0))
 
 export type NewExpense = Pick<Expense, "amount" | "concept" | "category" | "date">
 

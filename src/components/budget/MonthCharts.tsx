@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react"
 import { Activity, BarChart3, PieChart } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { daysInMonth, monthLabel, shiftMonth, summarizeMonth } from "../../utils/month"
-import type { BudgetCategory, Expense, FixedExpense, MonthSummary } from "../../types/budget"
+import { netAmount, type BudgetCategory, type Expense, type FixedExpense, type MonthSummary } from "../../types/budget"
 import { catColor } from "./helpers"
 
 interface MonthChartsProps {
@@ -46,7 +46,7 @@ export const MonthCharts = ({
     const dayMap = new Map<number, number>()
     for (const e of monthExps) {
       const day = Number(e.date.split("-")[2])
-      dayMap.set(day, (dayMap.get(day) || 0) + Number(e.amount))
+      dayMap.set(day, (dayMap.get(day) || 0) + netAmount(e))
     }
 
     const todayDate = new Date()
