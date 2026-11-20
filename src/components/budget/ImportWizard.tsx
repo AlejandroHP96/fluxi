@@ -6,7 +6,9 @@ import { monthLabel, toDateKey } from "../../utils/month"
 import { monthsInCsv, parseRevolutExpenses, type CsvExpense } from "../../utils/revolutCsv"
 import { applyVentajon, buildImportQueue, SKIP, ventajonMonths, type ImportItem } from "../../utils/importQueue"
 import { fetchVentajonPurchases } from "../../utils/ventajonClient"
-import { bankSessionValid, disconnectBank, fetchBankExpenses, startBankConnection } from "../../utils/bankClient"
+import {
+  bankSessionValid, disconnectBank, fetchBankExpenses, loadSelectedAccounts, maskIban, saveSelectedAccounts, startBankConnection,
+} from "../../utils/bankClient"
 import type { BudgetApi } from "../../hooks/useBudget"
 import { ImportReview, type Decision } from "./ImportReview"
 
@@ -28,6 +30,7 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [bankLoading, setBankLoading] = useState(false)
   const [bankError, setBankError] = useState<string | null>(null)
+  const [bankAccounts, setBankAccounts] = useState<string[]>(() => (budget.bank ? loadSelectedAccounts(budget.bank) : []))
   const [dragging, setDragging] = useState(false)
   const [decisions, setDecisions] = useState<Decision[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -78,11 +81,12 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
 
   const bringFromBank = async () => {
     if (!budget.bank) return
+    if (bankAccounts.length === 0) return setBankError("Elige al menos una cuenta")
     setBankError(null)
     setBankLoading(true)
     try {
       const dateFrom = toDateKey(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000))
-      const parsed = await fetchBankExpenses(budget.bank, dateFrom)
+      const parsed = await fetchBankExpenses(budget.bank, bankAccounts, dateFrom)
       if (parsed.length === 0) {
         setBankError("No hay gastos en los últimos 90 días")
         return
@@ -93,6 +97,12 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
     } finally {
       setBankLoading(false)
     }
+  }
+
+  const toggleAccount = (uid: string) => {
+    const next = bankAccounts.includes(uid) ? bankAccounts.filter((x) => x !== uid) : [...bankAccounts, uid]
+    setBankAccounts(next)
+    if (next.length) saveSelectedAccounts(next)
   }
 
   const connectBank = async () => {
@@ -230,9 +240,31 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
               <p className="mb-3 text-sm font-medium text-white/80">O tráelo directamente del banco</p>
               {bankSessionValid(budget.bank) ? (
                 <>
+                  {budget.bank.accounts.length > 0 && (
+                    <fieldset className="mb-3 space-y-1.5">
+                      <legend className="mb-1.5 text-xs text-white/60">Cuentas de las que traer movimientos</legend>
+                      {budget.bank.accounts.map((a) => (
+                        <label
+                          key={a.uid}
+                          className="flex cursor-pointer items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.025] px-3.5 py-2.5 transition-colors hover:border-white/20"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={bankAccounts.includes(a.uid)}
+                            onChange={() => toggleAccount(a.uid)}
+                            className="h-4 w-4 shrink-0 accent-cyan-400"
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-white/90">{a.name}</span>
+                          <span className="shrink-0 text-xs tabular-nums text-white/55">
+                            {[maskIban(a.iban), a.currency].filter(Boolean).join(" · ")}
+                          </span>
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
                   <button
                     type="button"
-                    disabled={bankLoading}
+                    disabled={bankLoading || bankAccounts.length === 0}
                     onClick={() => void bringFromBank()}
                     className="liquid-button w-full rounded-xl px-5 py-3.5 text-base font-semibold text-[#04202a] disabled:opacity-60"
                   >

@@ -1,4 +1,5 @@
 import { createSign } from "node:crypto"
+import { SAVINGS_TRANSFER } from "../../src/utils/savingsTransfer.js"
 
 // API de Enable Banking (open banking PSD2). Docs: https://enablebanking.com/docs/api/reference/
 // Cada petición lleva un JWT RS256 firmado con la clave privada de la aplicación (nunca sale del servidor).
@@ -154,7 +155,10 @@ export function toExpenses(txs: EbTransaction[]): BankExpense[] {
     const amount = Math.abs(Number(t.transaction_amount?.amount))
     const date = (t.booking_date || t.value_date || t.transaction_date || "").slice(0, 10)
     if (!(amount > 0) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) continue
-    const concept = (t.creditor?.name || (t.remittance_information || []).join(" ") || "Gasto").replace(/\s+/g, " ").trim()
+    const remittance = (t.remittance_information || []).join(" ").replace(/\s+/g, " ").trim()
+    const concept = (t.creditor?.name || remittance || "Gasto").replace(/\s+/g, " ").trim()
+    // Traspasos a Ahorros o bolsillos (el texto puede venir en el nombre o en el concepto): no son gastos
+    if (SAVINGS_TRANSFER.test(concept) || SAVINGS_TRANSFER.test(remittance)) continue
     out.push({ date, time: "", concept: concept.slice(0, 200), amount: Math.round(amount * 100) / 100 })
   }
   return out.sort((a, b) => a.date.localeCompare(b.date))

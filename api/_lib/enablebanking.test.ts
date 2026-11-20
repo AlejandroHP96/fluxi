@@ -56,3 +56,18 @@ describe("toExpenses", () => {
     ])
   })
 })
+
+describe("toExpenses: traspasos a Ahorros", () => {
+  const base = {
+    transaction_amount: { amount: "50", currency: "EUR" },
+    credit_debit_indicator: "DBIT" as const,
+    status: "BOOK",
+    booking_date: "2026-11-19",
+  }
+  it("descarta los traspasos a Ahorros o bolsillos (en el nombre o en el concepto)", () => {
+    expect(toExpenses([{ ...base, remittance_information: ["To EUR Savings"] }])).toEqual([])
+    expect(toExpenses([{ ...base, creditor: { name: "A Ahorros conjunta" } }])).toEqual([])
+    expect(toExpenses([{ ...base, creditor: { name: "Ana" }, remittance_information: ["To Pocket Viaje"] }])).toEqual([])
+    expect(toExpenses([{ ...base, creditor: { name: "Mercadona" } }])).toHaveLength(1)
+  })
+})

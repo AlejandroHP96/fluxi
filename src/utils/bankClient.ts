@@ -65,13 +65,38 @@ export const finishBankConnection = (code: string) => call<BankSession>({ action
 export const disconnectBank = (session: BankSession) =>
   call({ action: "disconnect", sessionId: session.sessionId }).catch(() => undefined)
 
-// Gastos de todas las cuentas de la sesión desde dateFrom ("AAAA-MM-DD"), con el formato del CSV de Revolut
-export async function fetchBankExpenses(session: BankSession, dateFrom: string): Promise<CsvExpense[]> {
+// Gastos de las cuentas elegidas (uids de la sesión) desde dateFrom ("AAAA-MM-DD"), con el formato del CSV de Revolut
+export async function fetchBankExpenses(session: BankSession, accountUids: string[], dateFrom: string): Promise<CsvExpense[]> {
   const { items } = await call<{ items: CsvExpense[] }>({
     action: "transactions",
     sessionId: session.sessionId,
-    accountUids: session.accounts.map((a) => a.uid),
+    accountUids,
     dateFrom,
   })
   return items
 }
+
+// Cuentas de las que se traen movimientos: se recuerda en este dispositivo (por defecto, todas)
+const ACCOUNTS_KEY = "fluxi_bank_accounts"
+
+export function loadSelectedAccounts(session: BankSession): string[] {
+  const all = session.accounts.map((a) => a.uid)
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) || "null") as string[] | null
+    const valid = Array.isArray(saved) ? saved.filter((uid) => all.includes(uid)) : []
+    return valid.length ? valid : all
+  } catch {
+    return all
+  }
+}
+
+export function saveSelectedAccounts(uids: string[]) {
+  try {
+    localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(uids))
+  } catch {
+    // sin almacenamiento (modo privado): solo vale para esta vez
+  }
+}
+
+// "ES12 3456 7890 1234" -> "•••• 1234"
+export const maskIban = (iban: string) => (iban ? `•••• ${iban.replace(/\s+/g, "").slice(-4)}` : "")

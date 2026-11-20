@@ -1,4 +1,5 @@
 import Papa from "papaparse"
+import { SAVINGS_TRANSFER } from "./savingsTransfer"
 
 // Gasto leído del CSV de Revolut (aún sin categoría ni guardar)
 export interface CsvExpense {
@@ -20,8 +21,6 @@ function splitDate(raw: string): [string, string] {
   return ["", ""]
 }
 
-// Traspasos con la cuenta de Ahorros e intereses: no son gastos
-const SAVINGS_TRANSFER = /^(A|Desde|To|From)\s+.*(Ahorros|Savings|Vault|Pocket|Bolsillo)|inter[eé]s.*(ahorros|savings|vault)/i
 
 /**
  * Gastos del CSV de Revolut: movimientos completados, en negativo, de la cuenta principal
