@@ -27,6 +27,18 @@ const SAVINGS_TRANSFER = /^(A|Desde|To|From)\s+.*(Ahorros|Savings|Vault|Pocket|B
  * Gastos del CSV de Revolut: movimientos completados, en negativo, de la cuenta principal
  * (no de Ahorros/Depósito) y que no sean traspasos a/desde Ahorros. Ingresos y reembolsos se ignoran.
  */
+// Importe con punto o coma decimal y separador de miles opcional: "-45.30", "-45,30", "-1.234,56", "-1,234.56".
+// El separador decimal es el último que aparece, salvo que se repita o lleve justo 3 cifras detrás (entonces es de miles)
+export function parseCsvAmount(raw: string): number {
+  const t = raw.replace(/[^0-9.,-]/g, "")
+  const last = Math.max(t.lastIndexOf("."), t.lastIndexOf(","))
+  if (last === -1) return parseFloat(t)
+  const sep = t[last]
+  const isThousands = t.split(sep).length > 2 || (t.length - last - 1 === 3 && !/[.,]/.test(t.slice(0, last)))
+  if (isThousands) return parseFloat(t.replace(/[.,]/g, ""))
+  return parseFloat(t.slice(0, last).replace(/[.,]/g, "") + "." + t.slice(last + 1))
+}
+
 export function parseRevolutExpenses(csvText: string): CsvExpense[] {
   const rows = Papa.parse(csvText, { header: true, skipEmptyLines: true }).data as Record<string, string>[]
   const out: CsvExpense[] = []
@@ -36,7 +48,7 @@ export function parseRevolutExpenses(csvText: string): CsvExpense[] {
     if (/dep[oó]sito|deposit|savings|ahorro/i.test(row["Producto"] || row["Product"] || "")) continue
     const concept = (row["Descripción"] || row["Description"] || row["Concepto"] || "").trim()
     if (SAVINGS_TRANSFER.test(concept)) continue
-    const amount = parseFloat(String(row["Importe"] || row["Amount"] || "0").replace(/[^0-9.-]/g, ""))
+    const amount = parseCsvAmount(String(row["Importe"] || row["Amount"] || "0"))
     if (isNaN(amount) || amount >= 0) continue
     const [date, time] = splitDate(row["Fecha de inicio"] || row["Started Date"] || row["Fecha de finalización"] || row["Completed Date"] || "")
     if (!date) continue
