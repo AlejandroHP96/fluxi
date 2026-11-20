@@ -138,11 +138,11 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
           No hay gastos que coincidan con la búsqueda «{search}».
         </div>
       ) : (
-        // Una sola tarjeta con los días como separadores
-        <div className="overflow-hidden rounded-2xl border border-white/[0.07] bg-white/[0.025]">
+        // Una sola tarjeta de alto fijo que se desplaza por dentro; la cabecera del día se queda pegada arriba
+        <div className="max-h-[min(30rem,62dvh)] overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.07] bg-white/[0.025] [scrollbar-width:thin]">
           {groups.map((g) => (
             <div key={g.date} className="border-white/[0.07] [&:not(:first-child)]:border-t">
-              <div className="flex items-baseline justify-between bg-white/[0.03] px-3.5 py-1.5">
+              <div className="sticky top-0 z-10 flex items-baseline justify-between bg-[#0c0f16] px-3.5 py-1.5">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-white/55 first-letter:uppercase">
                   {dayLabel(g.date, today)}
                 </span>
