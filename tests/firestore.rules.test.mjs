@@ -39,6 +39,11 @@ await t("setIncome", assertSucceeds(setDoc(b, { userId: "u1", income: { "2026-10
 await t("borrar income mes", assertSucceeds(setDoc(b, { userId: "u1", income: { "2026-10": deleteField() } }, { merge: true })))
 await t("fijos", assertSucceeds(setDoc(b, { userId: "u1", fixedExpenses: [{ id: "f", name: "Gym", amount: 30 }] }, { merge: true })))
 await t("memory", assertSucceeds(setDoc(b, { userId: "u1", memory: { "lidl": "a" } }, { merge: true })))
+const bank = { sessionId: "s1", validUntil: "2027-05-01T00:00:00Z", bankName: "Revolut", accounts: [{ uid: "a1", name: "EUR", iban: "LT00", currency: "EUR" }] }
+await t("guardar sesión del banco", assertSucceeds(setDoc(b, { userId: "u1", bank }, { merge: true })))
+await t("desconectar banco", assertSucceeds(setDoc(b, { userId: "u1", bank: deleteField() }, { merge: true })))
+await t("banco con campo extra", assertFails(setDoc(b, { userId: "u1", bank: { ...bank, token: "x" } }, { merge: true })))
+await t("banco no es mapa", assertFails(setDoc(b, { userId: "u1", bank: "abc" }, { merge: true })))
 await t("campo extra budget", assertFails(setDoc(b, { userId: "u1", hack: "x" }, { merge: true })))
 await t("200 categorias", assertFails(setDoc(b, { userId: "u1", categories: Array(200).fill({ id: "a", name: "x", pct: 0, savings: false }) }, { merge: true })))
 await t("otro escribe budget", assertFails(setDoc(doc(o, "budgets/u1"), { userId: "u2", income: {} }, { merge: true })))

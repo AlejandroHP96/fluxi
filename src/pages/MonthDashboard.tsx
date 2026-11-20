@@ -1,7 +1,8 @@
-import { Suspense, lazy, useMemo, useState } from "react"
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react"
 import { AlertTriangle, Plus } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
 import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
+import { finishBankConnection, takeBankRedirect } from "../utils/bankClient"
 import type { Expense } from "../types/budget"
 import { DEMO_EMAIL } from "../constants/demo"
 import { AppHeader } from "../components/budget/AppHeader"
@@ -51,6 +52,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   const [month, setMonth] = useState(currentMonthKey)
   const [modal, setModal] = useState<ModalState>(null)
   const [importing, setImporting] = useState(false)
+  const [bankError, setBankError] = useState<string | null>(null)
   const [settingsTab, setSettingsTab] = useState<"categories" | "fixed" | null>(null)
 
   const monthExpenses = useMemo(() => expenses.filter((e) => e.date.startsWith(month)), [expenses, month])
@@ -66,6 +68,26 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   // Gasto nuevo: hoy si estás en el mes actual; si no, el día 1 del mes que miras
   const defaultDate = summary.isCurrent ? todayKey() : `${month}-01`
   const firstTime = !loading && categories.length === 0
+
+  // Vuelta del banco tras autorizar: cierra el círculo una sola vez (StrictMode monta dos veces)
+  const bankRedirectDone = useRef(false)
+  useEffect(() => {
+    if (bankRedirectDone.current) return
+    bankRedirectDone.current = true
+    const redirect = takeBankRedirect()
+    if (!redirect) return
+    if ("error" in redirect) {
+      setBankError(redirect.error)
+      return
+    }
+    void finishBankConnection(redirect.code)
+      .then(async (session) => {
+        await budget.saveBank(session)
+        setImporting(true)
+      })
+      .catch((e: unknown) => setBankError((e as Error).message))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const header = (
     <AppHeader
@@ -83,6 +105,13 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
     </div>
   )
 
+  const bankErrorBanner = bankError && (
+    <div role="alert" className="flex items-start gap-2.5 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{bankError}</span>
+    </div>
+  )
+
   // Primera vez: nómina + reparto propuesto
   if (firstTime) {
     return (
@@ -90,6 +119,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         {header}
         <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
           {errorBanner}
+          {bankErrorBanner}
           <Suspense fallback={null}>
             <FirstSetup
               month={month}
@@ -126,6 +156,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         />
 
         {errorBanner}
+        {bankErrorBanner}
 
         {email === DEMO_EMAIL && (
           <p className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-2.5 text-sm text-cyan-100">

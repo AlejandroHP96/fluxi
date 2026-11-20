@@ -1,4 +1,5 @@
 import { cleanVentajonConcept, categorizeVentajonItem } from "./_lib/ventajon.js"
+import { firebaseUid } from "./_lib/owner.js"
 
 export const config = {
   runtime: "nodejs",
@@ -137,20 +138,6 @@ export async function fetchVentajonPurchases(session: Session, months: string[])
     }
   }
   return out
-}
-
-// Solo el dueño de la app: valida el ID token de Firebase y compara el UID
-async function firebaseUid(idToken: string): Promise<string | null> {
-  const apiKey = process.env.VITE_FIREBASE_API_KEY
-  if (!idToken || !apiKey) return null
-  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken }),
-  })
-  if (!r.ok) return null
-  const d = await r.json()
-  return d.users?.[0]?.localId ?? null
 }
 
 export default async function handler(req: any, res: any) {

@@ -7,6 +7,7 @@ import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
 import type { BudgetCategory, Expense, FixedExpense, NewExpense } from "../types/budget"
 import type { CategoryMemory } from "../utils/importQueue"
+import type { BankSession } from "../utils/bankClient"
 
 // Gastos (colección "expenses") y ajustes del usuario en budgets/{uid}: categorías con %, nómina de cada
 // mes y la memoria de categorías elegidas al importar
@@ -16,6 +17,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
   const [income, setIncomeMap] = useState<Record<string, number>>({})
   const [memory, setMemory] = useState<CategoryMemory>({})
+  const [bank, setBank] = useState<BankSession | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,6 +28,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
     setFixedExpenses([])
     setIncomeMap({})
     setMemory({})
+    setBank(null)
     setError(null)
     setLoading(true)
     if (!userId) return
@@ -67,6 +70,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
       setFixedExpenses((data?.fixedExpenses as FixedExpense[] | undefined) ?? [])
       setIncomeMap((data?.income as Record<string, number> | undefined) ?? {})
       setMemory((data?.memory as CategoryMemory | undefined) ?? {})
+      setBank((data?.bank as BankSession | undefined) ?? null)
       markLoaded("settings")
     }, onErr("settings"))
 
@@ -138,10 +142,14 @@ const useFirestoreBudget = (userId: string | undefined) => {
   const remember = (key: string, choice: string) =>
     run(() => setDoc(settingsRef(), { userId, memory: { [key]: choice } }, { merge: true }))
 
+  // Conexión con el banco (sesión de Enable Banking guardada en budgets/{uid}.bank); null la desconecta
+  const saveBank = (b: BankSession | null) =>
+    run(() => setDoc(settingsRef(), { userId, bank: b ?? deleteField() }, { merge: true }))
+
   return {
-    expenses, categories, fixedExpenses, income, memory, loading, error,
+    expenses, categories, fixedExpenses, income, memory, bank, loading, error,
     addExpense, updateExpense, deleteExpense, reassignExpenses,
-    setIncome, saveCategories, saveFixedExpenses, remember,
+    setIncome, saveCategories, saveFixedExpenses, remember, saveBank,
   }
 }
 
@@ -277,6 +285,9 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       setMemory((m) => ({ ...m, [key]: choice }))
       return ok()
     },
+    // La demo no conecta bancos
+    bank: null,
+    saveBank: async () => true,
   }
 }
 

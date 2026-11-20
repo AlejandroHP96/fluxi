@@ -41,22 +41,24 @@ service cloud.firestore {
         && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys());
     }
 
-    // Reparto (categories), nóminas por mes (income), gastos fijos y categorías recordadas al importar (memory)
+    // Reparto (categories), nóminas por mes (income), gastos fijos, categorías recordadas al importar (memory)
+    // y la sesión del banco de Enable Banking (bank)
     function validBudget(d) {
       return d.userId == request.auth.uid
         && (!('categories' in d) || (d.categories is list && d.categories.size() <= 50))
         && (!('fixedExpenses' in d) || (d.fixedExpenses is list && d.fixedExpenses.size() <= 50))
         && (!('income' in d) || (d.income is map && d.income.size() <= 600))
-        && (!('memory' in d) || (d.memory is map && d.memory.size() <= 3000));
+        && (!('memory' in d) || (d.memory is map && d.memory.size() <= 3000))
+        && (!('bank' in d) || d.bank == null || (d.bank is map && d.bank.keys().hasOnly(['sessionId', 'validUntil', 'bankName', 'accounts'])));
     }
 
     match /budgets/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null && request.auth.uid == uid && notDemo()
-        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory'])
+        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank'])
         && validBudget(request.resource.data);
       allow update: if request.auth != null && request.auth.uid == uid && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank'])
         && validBudget(request.resource.data);
       allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
     }

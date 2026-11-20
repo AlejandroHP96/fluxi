@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type DragEvent } from "react"
 import { createPortal } from "react-dom"
 import { X, FileUp, Loader2, CheckCircle2 } from "lucide-react"
 import { fmt } from "../../utils/formatters"
-import { monthLabel } from "../../utils/month"
+import { monthLabel, toDateKey } from "../../utils/month"
 import { monthsInCsv, parseRevolutExpenses, type CsvExpense } from "../../utils/revolutCsv"
 import { applyVentajon, buildImportQueue, SKIP, ventajonMonths, type ImportItem } from "../../utils/importQueue"
 import { fetchVentajonPurchases } from "../../utils/ventajonClient"
+import { bankSessionValid, disconnectBank, fetchBankExpenses, startBankConnection } from "../../utils/bankClient"
 import type { BudgetApi } from "../../hooks/useBudget"
 import { ImportReview, type Decision } from "./ImportReview"
 
@@ -25,6 +26,8 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
   const [queue, setQueue] = useState<ImportItem[]>([])
   const [warning, setWarning] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [bankLoading, setBankLoading] = useState(false)
+  const [bankError, setBankError] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [decisions, setDecisions] = useState<Decision[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
@@ -47,6 +50,14 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
     return () => window.removeEventListener("keydown", onKey)
   }, [step, onClose])
 
+  // Común para CSV y banco: deja los gastos listos y pasa a elegir mes
+  const applyRows = (parsed: CsvExpense[]) => {
+    setRows(parsed)
+    const list = monthsInCsv(parsed)
+    setMonth(list.some((m) => m.month === viewMonth) ? viewMonth : list[0].month)
+    setStep("month")
+  }
+
   const readFile = async (file: File | undefined) => {
     if (!file) return
     setUploadError(null)
@@ -62,10 +73,38 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
       )
       return
     }
-    setRows(parsed)
-    const list = monthsInCsv(parsed)
-    setMonth(list.some((m) => m.month === viewMonth) ? viewMonth : list[0].month)
-    setStep("month")
+    applyRows(parsed)
+  }
+
+  const bringFromBank = async () => {
+    if (!budget.bank) return
+    setBankError(null)
+    setBankLoading(true)
+    try {
+      const dateFrom = toDateKey(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000))
+      const parsed = await fetchBankExpenses(budget.bank, dateFrom)
+      if (parsed.length === 0) {
+        setBankError("No hay gastos en los últimos 90 días")
+        return
+      }
+      applyRows(parsed)
+    } catch (e) {
+      setBankError((e as Error).message)
+    } finally {
+      setBankLoading(false)
+    }
+  }
+
+  const connectBank = async () => {
+    setBankError(null)
+    setBankLoading(true)
+    try {
+      // Si sale bien, la página navega al banco y no vuelve aquí
+      await startBankConnection()
+    } catch (e) {
+      setBankError((e as Error).message)
+      setBankLoading(false)
+    }
   }
 
   const onDrop = (e: DragEvent) => {
@@ -186,6 +225,49 @@ export const ImportWizard = ({ budget, viewMonth, onManageCategories, onClose }:
             <p className="mt-4 text-xs leading-relaxed text-white/60">
               En Revolut: Perfil &gt; Extractos &gt; Excel/CSV. Te iré preguntando la categoría de cada gasto del mes que elijas.
             </p>
+
+            <div className="mt-5 border-t border-white/10 pt-5">
+              <p className="mb-3 text-sm font-medium text-white/80">O tráelo directamente del banco</p>
+              {bankSessionValid(budget.bank) ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={bankLoading}
+                    onClick={() => void bringFromBank()}
+                    className="liquid-button w-full rounded-xl px-5 py-3.5 text-base font-semibold text-[#04202a] disabled:opacity-60"
+                  >
+                    {bankLoading ? "Trayendo movimientos…" : `Traer movimientos de ${budget.bank.bankName}`}
+                  </button>
+                  <div className="mt-2.5 flex items-center justify-between gap-3">
+                    <p className="text-xs text-white/60">
+                      {budget.bank.validUntil ? `Conexión válida hasta ${new Date(budget.bank.validUntil).toLocaleDateString("es-ES")}` : "Banco conectado"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={async () => { if (budget.bank) await disconnectBank(budget.bank); void budget.saveBank(null) }}
+                      className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:bg-white/[0.08] hover:text-white"
+                    >
+                      Desconectar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={bankLoading}
+                    onClick={() => void connectBank()}
+                    className="w-full rounded-xl border border-white/10 bg-white/[0.03] px-5 py-3.5 text-base font-semibold text-white/85 transition-colors hover:bg-white/[0.08] hover:text-white disabled:opacity-60"
+                  >
+                    {bankLoading ? "Abriendo el banco…" : "Conectar Revolut"}
+                  </button>
+                  {budget.bank && !bankSessionValid(budget.bank) && (
+                    <p className="mt-2.5 text-xs text-white/60">La conexión caducó, vuelve a autorizar.</p>
+                  )}
+                </>
+              )}
+              {bankError && <p className="mt-3 text-sm text-red-300">{bankError}</p>}
+            </div>
           </div>
         )}
 
