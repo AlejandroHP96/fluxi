@@ -139,7 +139,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
         </div>
       ) : (
         // Una sola tarjeta de alto fijo que se desplaza por dentro; la cabecera del día se queda pegada arriba
-        <div className="max-h-[min(30rem,62dvh)] overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.07] bg-white/[0.025] [scrollbar-width:thin]">
+        <div className="max-h-[min(30rem,62dvh)] overflow-y-auto overscroll-contain rounded-2xl border border-white/[0.07] bg-white/[0.025] nice-scroll">
           {groups.map((g) => (
             <div key={g.date} className="border-white/[0.07] [&:not(:first-child)]:border-t">
               <div className="sticky top-0 z-10 flex items-baseline justify-between bg-[#0c0f16] px-3.5 py-1.5">

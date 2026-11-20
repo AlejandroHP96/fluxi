@@ -129,6 +129,30 @@ body {
   background: rgba(6, 182, 212, 0.4);
 }
 
+/* Barra de scroll de las cajas con scroll interno (lista de gastos): fina, separada del borde y en cian */
+.nice-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px 0;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.45), rgba(14, 165, 233, 0.3)) padding-box;
+  border-radius: 9999px;
+}
+.nice-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(34, 211, 238, 0.75), rgba(14, 165, 233, 0.55)) padding-box;
+}
+/* Firefox no tiene ::-webkit-scrollbar: solo admite grosor y colores */
+@supports not selector(::-webkit-scrollbar) {
+  .nice-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(34, 211, 238, 0.45) transparent;
+  }
+}
+
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
 }
