@@ -219,3 +219,38 @@ describe("summarizeMonth", () => {
     expect(s.unassigned).toBeCloseTo(1800 * 0.4)
   })
 })
+
+describe("summarizeMonth: sobres en € y en %", () => {
+  const cats: BudgetCategory[] = [
+    { id: "comida", name: "Comida", pct: 0, amount: 300, savings: false },
+    cat("ocio", "Ocio", 40),
+    cat("otros", "Otros", 30),
+    cat("ahorro", "Ahorro", 30, true),
+  ]
+
+  it("los € salen primero y los % se reparten sobre el resto", () => {
+    const s = summarizeMonth([], "2026-11", 2000, cats, [fixed(700)], new Date(2026, 10, 15))
+    const by = (id: string) => [...s.envelopes, ...s.savings].find((e) => e.category.id === id)!.allocated
+    expect(s.totalAmount).toBe(300)
+    expect(s.pctBase).toBe(1000)
+    expect(by("comida")).toBe(300)
+    expect(by("ocio")).toBe(400)
+    expect(by("otros")).toBe(300)
+    expect(by("ahorro")).toBe(300)
+    expect(s.totalPct).toBe(100)
+    expect(s.unassigned).toBe(0)
+    expect(s.amountOver).toBe(0)
+  })
+
+  it("si los € no caben, avisa y los % se quedan a 0", () => {
+    const s = summarizeMonth([], "2026-11", 900, cats, [fixed(700)], new Date(2026, 10, 15))
+    expect(s.amountOver).toBe(100)
+    expect(s.pctBase).toBe(0)
+    expect(s.envelopes.find((e) => e.category.id === "ocio")!.allocated).toBe(0)
+  })
+
+  it("solo sobres en €: lo que sobra queda sin asignar", () => {
+    const s = summarizeMonth([], "2026-11", 1000, [cats[0]], [], new Date(2026, 10, 15))
+    expect(s.unassigned).toBe(700)
+  })
+})

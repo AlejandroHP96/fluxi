@@ -71,15 +71,21 @@ export function summarizeMonth(
   const netIncome = Math.max(0, rawIncome - totalFixed)
   const base = income !== null ? netIncome : 0
 
+  // Primero los sobres en € (cantidad fija) y lo que queda se reparte en %
+  const isAmount = (c: BudgetCategory) => typeof c.amount === "number"
+  const totalAmount = categories.reduce((a, c) => a + (isAmount(c) ? Number(c.amount) || 0 : 0), 0)
+  const pctBase = Math.max(0, base - totalAmount)
+  const amountOver = income !== null ? Math.max(0, totalAmount - netIncome) : 0
+
   const envelope = (c: BudgetCategory): EnvelopeSummary => {
-    const allocated = (base * c.pct) / 100
+    const allocated = isAmount(c) ? (income !== null ? Number(c.amount) || 0 : 0) : (pctBase * c.pct) / 100
     const spent = spentBy.get(c.id) || 0
     const pctSpent = allocated > 0 ? (spent / allocated) * 100 : spent > 0 ? 100 : 0
     const status = spent > allocated + 0.005 ? "pasado" : pctSpent >= NEAR_PCT ? "casi" : "ok"
     return { category: c, allocated, spent, remaining: allocated - spent, pctSpent, status }
   }
 
-  const totalPct = categories.reduce((a, c) => a + Number(c.pct), 0)
+  const totalPct = categories.reduce((a, c) => a + (isAmount(c) ? 0 : Number(c.pct) || 0), 0)
   const unassignedPct = Math.max(0, 100 - totalPct)
   const savings = categories.filter((c) => c.savings).map(envelope)
   const envelopes = categories.filter((c) => !c.savings).map(envelope)
@@ -97,8 +103,8 @@ export function summarizeMonth(
   }
 
   return {
-    month, income, fixedExpenses, totalFixed, netIncome, totalPct, unassignedPct,
-    unassigned: (base * unassignedPct) / 100, saved, spendable, spent, available,
+    month, income, fixedExpenses, totalFixed, netIncome, totalAmount, pctBase, amountOver, totalPct, unassignedPct,
+    unassigned: (pctBase * unassignedPct) / 100, saved, spendable, spent, available,
     pctSpent, pctElapsed, status, daysInMonth: total, daysLeft,
     dailyAllowance: isCurrent && income !== null && daysLeft > 0 ? Math.max(0, available) / daysLeft : null,
     isCurrent, isPast, envelopes, savings, uncategorized, count: inMonth.length,

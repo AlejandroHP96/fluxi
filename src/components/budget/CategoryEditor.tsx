@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react"
-import { blankDraft, draftTotal, type DraftCat } from "./categoryDraft"
+import { fmt } from "../../utils/formatters"
+import { blankDraft, draftAmountTotal, draftTotal, type DraftCat } from "./categoryDraft"
 
 interface CategoryEditorProps {
   draft: DraftCat[]
@@ -14,7 +15,11 @@ const pctText = (n: number) => `${Math.round(n * 10) / 10} %`.replace(".", ",")
 // Suma de % en vivo: sin asignar, todo repartido o te pasas
 export const PctTotal = ({ draft }: { draft: DraftCat[] }) => {
   const total = draftTotal(draft)
-  const over = total > 100.005
+  const amountTotal = draftAmountTotal(draft)
+  const hasAmount = draft.some((d) => d.mode === "eur")
+  const hasPct = draft.some((d) => d.mode === "pct")
+  // Sin sobres en %, la suma de % no importa: lo que no cubran los € queda libre
+  const over = hasPct && total > 100.005
   const free = 100 - total
   return (
     <div
@@ -27,9 +32,15 @@ export const PctTotal = ({ draft }: { draft: DraftCat[] }) => {
       }`}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-semibold tabular-nums">Sumas {pctText(total)}</span>
+        <span className="font-semibold tabular-nums">{hasPct ? `Sumas ${pctText(total)}` : "Sin sobres en %"}</span>
         <span className="text-xs">
-          {over ? `Te pasas ${pctText(total - 100)}` : free > 0.005 ? `Sin asignar ${pctText(free)} (dinero libre)` : "Todo repartido"}
+          {!hasPct
+            ? "Lo que sobre queda libre"
+            : over
+              ? `Te pasas ${pctText(total - 100)}`
+              : free > 0.005
+                ? `Sin asignar ${pctText(free)} (dinero libre)`
+                : "Todo repartido"}
         </span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
@@ -38,6 +49,12 @@ export const PctTotal = ({ draft }: { draft: DraftCat[] }) => {
           style={{ width: `${Math.min(100, total)}%` }}
         />
       </div>
+      {hasAmount && (
+        <p className="mt-2 text-xs text-white/65">
+          Sobres en €: <span className="font-semibold tabular-nums text-white/85">{fmt(amountTotal)}</span>
+          {hasPct ? " · salen primero y los % se reparten sobre lo que quede" : ""}
+        </p>
+      )}
       {over && <p className="mt-2 text-xs">Puedes guardarlo igual, pero repartes más de lo que cobras.</p>}
     </div>
   )
@@ -82,14 +99,34 @@ export const CategoryEditor = ({ draft, onChange, onDelete, sticky = false }: Ca
               />
               <div className="relative w-[5.5rem] shrink-0">
                 <input
-                  value={d.pct}
-                  onChange={(e) => patch(d.id, { pct: e.target.value })}
+                  value={d.mode === "eur" ? d.amount : d.pct}
+                  onChange={(e) => patch(d.id, d.mode === "eur" ? { amount: e.target.value } : { pct: e.target.value })}
                   onFocus={(e) => e.target.select()}
                   inputMode="decimal"
-                  aria-label={`Porcentaje de ${d.name || "la categoría"}`}
+                  aria-label={`${d.mode === "eur" ? "Importe" : "Porcentaje"} de ${d.name || "la categoría"}`}
                   className="glass-input w-full rounded-xl py-2.5 pl-3 pr-8 text-right text-base font-semibold tabular-nums"
                 />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-white/60">%</span>
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-white/60">
+                  {d.mode === "eur" ? "€" : "%"}
+                </span>
+              </div>
+              {/* Sobre en % del resto o de importe fijo en € */}
+              <div className="flex shrink-0 rounded-xl bg-white/[0.06] p-0.5" role="radiogroup" aria-label={`Tipo de reparto de ${d.name || "la categoría"}`}>
+                {(["eur", "pct"] as const).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={d.mode === m}
+                    aria-label={m === "eur" ? "Importe fijo en euros" : "Porcentaje del resto"}
+                    onClick={() => patch(d.id, { mode: m })}
+                    className={`h-9 w-8 rounded-lg text-sm font-semibold transition-colors ${
+                      d.mode === m ? "bg-white/15 text-white" : "text-white/50 hover:text-white"
+                    }`}
+                  >
+                    {m === "eur" ? "€" : "%"}
+                  </button>
+                ))}
               </div>
             </div>
 

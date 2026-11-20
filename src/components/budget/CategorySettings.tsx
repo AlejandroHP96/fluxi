@@ -147,7 +147,7 @@ export const CategorySettings = ({
             <h2 className="text-lg font-semibold tracking-tight">Presupuesto y reparto</h2>
             <p className="mt-0.5 text-sm text-white/65">
               {tab === "categories"
-                ? "Reparte en sobres con % el dinero que queda tras descontar los gastos fijos."
+                ? "Cada sobre lleva una cantidad fija (€) o un % de lo que quede tras los gastos fijos y los sobres en €."
                 : "Gastos que se repiten todos los meses. Se descuentan de la nómina antes de hacer los %."}
             </p>
           </div>
@@ -174,7 +174,7 @@ export const CategorySettings = ({
                 tab === "categories" ? "bg-white/15 text-white shadow-sm" : "text-white/60 hover:text-white"
               }`}
             >
-              Sobres (%)
+              Sobres
             </button>
             <button
               type="button"

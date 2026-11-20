@@ -15,7 +15,8 @@ export type NewExpense = Pick<Expense, "amount" | "concept" | "category" | "date
 export interface BudgetCategory {
   id: string
   name: string
-  pct: number // % del dinero restante tras gastos fijos (0-100)
+  pct: number // % del resto (nómina − gastos fijos − sobres en €), 0-100. En los sobres en € no se usa (0)
+  amount?: number // sobre de importe fijo en € al mes: si está, el sobre es en € y se reparte antes que los %
   savings: boolean // ahorro: su parte se aparta y no se gasta
 }
 
@@ -36,7 +37,7 @@ export type EnvelopeStatus = "ok" | "casi" | "pasado"
 
 export interface EnvelopeSummary {
   category: BudgetCategory
-  allocated: number // base (nómina − fijos) * pct / 100 (0 si no hay nómina)
+  allocated: number // en €: su importe; en %: resto * pct / 100 (0 si no hay nómina)
   spent: number
   remaining: number // puede ser negativo
   pctSpent: number // gastado / asignado * 100 (0 si no hay asignado)
@@ -51,9 +52,12 @@ export interface MonthSummary {
   fixedExpenses: FixedExpense[] // gastos fijos mensuales
   totalFixed: number // suma de los gastos fijos
   netIncome: number // nómina - gastos fijos (base para sobres, mín 0)
-  totalPct: number // suma de los % de todas las categorías
+  totalAmount: number // suma de los sobres en €
+  pctBase: number // resto que se reparte en %: nómina − fijos − sobres en € (mín 0)
+  amountOver: number // € que piden los sobres en € por encima de lo disponible (0 si caben)
+  totalPct: number // suma de los % de las categorías en %
   unassignedPct: number // 100 - totalPct (0 si se pasa de 100)
-  unassigned: number // € sin asignar (dinero libre)
+  unassigned: number // € sin asignar (dinero libre): la parte del resto que no cubren los %
   saved: number // € apartados en categorías de ahorro
   spendable: number // nómina - fijos - ahorro (lo que hay para gastar, incluido lo sin asignar)
   spent: number // todos los gastos del mes apuntados en sobres

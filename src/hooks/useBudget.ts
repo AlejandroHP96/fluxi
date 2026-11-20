@@ -9,6 +9,13 @@ import type { BudgetCategory, Expense, FixedExpense, NewExpense } from "../types
 import type { CategoryMemory } from "../utils/importQueue"
 import type { BankSession } from "../utils/bankClient"
 
+// Categoría lista para guardar: los sobres en € llevan amount (y pct 0); los de % no llevan la clave
+// (Firestore no admite campos undefined)
+const cleanCategory = (c: BudgetCategory): BudgetCategory => {
+  const base = { id: c.id || newCategoryId(), name: c.name.trim(), pct: Number(c.pct) || 0, savings: Boolean(c.savings) }
+  return typeof c.amount === "number" ? { ...base, pct: 0, amount: Math.max(0, Math.round(c.amount * 100) / 100) } : base
+}
+
 // Gastos (colección "expenses") y ajustes del usuario en budgets/{uid}: categorías con %, nómina de cada
 // mes y la memoria de categorías elegidas al importar
 const useFirestoreBudget = (userId: string | undefined) => {
@@ -127,7 +134,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
   const saveCategories = (list: BudgetCategory[]) =>
     run(() => setDoc(settingsRef(), {
       userId,
-      categories: list.map((c) => ({ id: c.id || newCategoryId(), name: c.name.trim(), pct: Number(c.pct) || 0, savings: Boolean(c.savings) })),
+      categories: list.map(cleanCategory),
     }, { merge: true }))
 
   // Guarda la lista completa de gastos fijos mensuales (nombre e importe en €)
@@ -286,7 +293,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       return ok()
     },
     saveCategories: (list: BudgetCategory[]) => {
-      setCategories(list.map((c) => ({ id: c.id || newCategoryId(), name: c.name.trim(), pct: Number(c.pct) || 0, savings: Boolean(c.savings) })))
+      setCategories(list.map(cleanCategory))
       return ok()
     },
     saveFixedExpenses: (list: FixedExpense[]) => {

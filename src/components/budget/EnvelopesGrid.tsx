@@ -56,7 +56,7 @@ const EnvelopeCard = ({
             <span className="truncate text-sm font-semibold text-white/95">{e.category.name}</span>
           </div>
           <span className="shrink-0 rounded-full bg-white/[0.08] px-2 py-0.5 text-[11px] font-medium tabular-nums text-white/70">
-            {isSavings ? "Ahorro" : pct(e.category.pct)}
+            {isSavings ? "Ahorro" : typeof e.category.amount === "number" ? `${Math.round(e.category.amount)} €` : pct(e.category.pct)}
           </span>
         </div>
 
@@ -119,10 +119,11 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
               {s.envelopes.length + s.savings.length}
             </span>
           </div>
-          {hasIncome && s.totalFixed > 0 && (
+          {hasIncome && (s.totalFixed > 0 || s.totalAmount > 0) && (
             <p className="mt-0.5 text-xs text-white/50">
-              Reparto sobre <span className="font-medium text-white/75 tabular-nums">{fmt(s.netIncome)}</span>{" "}
-              (nómina {fmt(s.income ?? 0)} − {fmt(s.totalFixed)} fijos)
+              % sobre <span className="font-medium text-white/75 tabular-nums">{fmt(s.pctBase)}</span> (nómina {fmt(s.income ?? 0)}
+              {s.totalFixed > 0 && ` − ${fmt(s.totalFixed)} fijos`}
+              {s.totalAmount > 0 && ` − ${fmt(s.totalAmount)} en sobres de €`})
             </p>
           )}
         </div>
@@ -132,13 +133,20 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
           className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-white/75 transition-colors hover:border-cyan-400/40 hover:text-white"
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
-          Ajustar reparto (%)
+          Ajustar reparto
         </button>
       </div>
 
       {!hasIncome && (
         <p className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-3 text-sm text-cyan-100">
           Apunta la nómina de este mes para ver cuánto dinero corresponde a cada sobre.
+        </p>
+      )}
+
+      {s.amountOver > 0.005 && (
+        <p className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/[0.09] px-4 py-3 text-sm text-amber-100">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          Los sobres en € piden {fmt(s.amountOver)} más de lo que queda tras los gastos fijos. Los sobres en % se quedan a 0 €.
         </p>
       )}
 
