@@ -1,7 +1,9 @@
 import { useState, type FormEvent } from "react"
 import { Check, Pencil, PiggyBank, Receipt, TrendingDown, Wallet, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
-import type { MonthStatus, MonthSummary } from "../../types/budget"
+import { walletBalance, type MonthStatus, type MonthSummary, type Wallet as SavingsWallet } from "../../types/budget"
+import { EMPTY_WALLET } from "../../utils/wallet"
+import { WalletModal } from "./WalletModal"
 import { parseAmount } from "./helpers"
 
 interface BentoKpisProps {
@@ -9,7 +11,8 @@ interface BentoKpisProps {
   suggestedIncome: number | null
   onSetIncome: (month: string, amount: number) => Promise<boolean>
   onEditFixed: () => void
-  onEditCategories: () => void
+  wallet: SavingsWallet | null
+  onSaveWallet: (w: SavingsWallet) => Promise<boolean>
 }
 
 const STATUS_BADGES: Record<MonthStatus, { label: string; bg: string; text: string; border: string }> = {
@@ -44,8 +47,10 @@ export const BentoKpis = ({
   suggestedIncome,
   onSetIncome,
   onEditFixed,
-  onEditCategories,
+  wallet,
+  onSaveWallet,
 }: BentoKpisProps) => {
+  const [walletOpen, setWalletOpen] = useState(false)
   const [editingIncome, setEditingIncome] = useState(false)
   const [incomeVal, setIncomeVal] = useState(s.income !== null ? String(s.income).replace(".", ",") : "")
   const [savingIncome, setSavingIncome] = useState(false)
@@ -258,43 +263,46 @@ export const BentoKpis = ({
     )
   }
 
-  // Tarjeta 3: Ahorro Apartado
+  // Tarjeta 3: Ahorro = cartera de ahorros (saldo a mano + movimientos), aparte de los sobres
   const renderSavingsCard = () => {
+    const last = wallet?.movements[0]
     return (
-      <div className="glass-panel relative flex flex-col justify-between overflow-hidden rounded-3xl p-4 sm:p-5">
+      <button
+        type="button"
+        onClick={() => setWalletOpen(true)}
+        className="glass-panel relative flex flex-col justify-between overflow-hidden rounded-3xl p-4 text-left transition-colors hover:border-cyan-400/30 sm:p-5"
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-1.5 text-white/55">
             <PiggyBank className="h-3.5 w-3.5 text-cyan-300" />
-            <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">
-              Ahorro<span className="hidden sm:inline"> Apartado</span>
-            </span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em]">Ahorro</span>
           </div>
-          <span className="rounded-full bg-cyan-400/10 border border-cyan-400/20 px-2 py-0.5 text-[11px] font-semibold text-cyan-300 tabular-nums">
-            {hasIncome && s.netIncome > 0
-              ? `${Math.round((s.saved / s.netIncome) * 100)} %`
-              : "0 %"}
-          </span>
+          <Pencil className="h-3.5 w-3.5 text-white/40" />
         </div>
 
         <div className="my-2.5 sm:my-3">
-          <p className="text-2xl font-extrabold tracking-tight tabular-nums text-white sm:text-4xl">
-            {fmt(s.saved)}
-          </p>
-          <p className="mt-1 text-xs text-white/65">
-            {s.saved > 0 ? (
-              "Se aparta y no cuenta para gastar"
-            ) : (
-              <button onClick={onEditCategories} className="hover:text-cyan-300 underline underline-offset-2">
-                Configura un sobre de ahorro
-              </button>
-            )}
+          <p className="text-2xl font-extrabold tracking-tight tabular-nums text-white sm:text-4xl">{fmt(walletBalance(wallet))}</p>
+          <p className="mt-1 truncate text-xs text-white/65">
+            {last
+              ? `Último: ${last.amount > 0 ? "+" : ""}${fmt(last.amount)} · ${last.note || "Movimiento"}`
+              : wallet
+                ? "Sin movimientos"
+                : "Toca para poner tu saldo"}
           </p>
         </div>
 
         <div className="mt-auto border-t border-white/[0.06] pt-2 text-[11px] text-white/60">
-          Para gastar libre: <span className="font-semibold text-white/90 tabular-nums">{fmt(s.spendable)}</span>
+          {s.saved > 0.005 ? (
+            <>
+              Sobres de ahorro este mes: <span className="font-semibold text-white/90 tabular-nums">{fmt(s.saved)}</span>
+            </>
+          ) : (
+            <>
+              Para gastar libre: <span className="font-semibold text-white/90 tabular-nums">{fmt(s.spendable)}</span>
+            </>
+          )}
         </div>
-      </div>
+      </button>
     )
   }
 
@@ -346,6 +354,7 @@ export const BentoKpis = ({
       {renderIncomeCard()}
       {renderSavingsCard()}
       {renderSpentCard()}
+      {walletOpen && <WalletModal wallet={wallet ?? EMPTY_WALLET} onSave={onSaveWallet} onClose={() => setWalletOpen(false)} />}
     </div>
   )
 }

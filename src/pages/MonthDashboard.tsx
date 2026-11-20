@@ -10,7 +10,6 @@ import { MonthNav } from "../components/budget/MonthNav"
 import { BentoKpis } from "../components/budget/BentoKpis"
 import { MonthCharts } from "../components/budget/MonthCharts"
 import { EnvelopesGrid } from "../components/budget/EnvelopesGrid"
-import { WalletCard } from "../components/budget/WalletCard"
 import { ExpenseList } from "../components/budget/ExpenseList"
 
 const ExpenseModal = lazy(() =>
@@ -171,7 +170,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           suggestedIncome={lastIncomeBefore(income, month)}
           onSetIncome={setIncome}
           onEditFixed={() => openSettings("fixed")}
-          onEditCategories={() => openSettings("categories")}
+          wallet={budget.wallet}
+          onSaveWallet={budget.saveWallet}
         />
 
         {/* Fila 2: Gráficas de cada mes (Evolución diaria, Historial 6 meses, Reparto) */}
@@ -192,7 +192,6 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
               categories={categories}
               onEdit={() => openSettings("categories")}
             />
-            <WalletCard wallet={budget.wallet} onSave={budget.saveWallet} />
           </div>
           <div className="lg:col-span-5 lg:sticky lg:top-20">
             <ExpenseList

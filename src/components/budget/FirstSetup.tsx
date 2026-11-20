@@ -66,7 +66,7 @@ export const FirstSetup = ({ month, onSubmit }: FirstSetupProps) => {
       <div>
         <p className="mb-1 text-sm font-medium text-white/80">2. ¿Cómo lo repartes?</p>
         <p className="mb-3 text-xs text-white/60">
-          Te propongo un reparto: cambia nombres y porcentajes, añade o borra. Marca «Ahorro» en lo que quieras apartar sin gastarlo.
+          Te propongo un reparto: cambia nombres, porcentajes o importes en €, añade o borra. Tus ahorros los llevas aparte en la tarjeta «Ahorro».
         </p>
         <CategoryEditor draft={draft} onChange={setDraft} onDelete={(row) => setDraft((d) => d.filter((x) => x.id !== row.id))} />
       </div>

@@ -215,11 +215,11 @@ export type BudgetApi = ReturnType<typeof useFirestoreBudget>
 
 // Plantilla que se propone al crear las categorías por primera vez
 export const CATEGORY_TEMPLATE: Array<Omit<BudgetCategory, "id">> = [
-  { name: "Ahorro", pct: 20, savings: true },
-  { name: "Vivienda", pct: 30, savings: false },
-  { name: "Alimentación", pct: 20, savings: false },
-  { name: "Transporte", pct: 10, savings: false },
-  { name: "Ocio", pct: 10, savings: false },
+  // Sin sobre de ahorro: el ahorro va en la cartera (tarjeta «Ahorro»), que se lleva a mano
+  { name: "Vivienda", pct: 35, savings: false },
+  { name: "Alimentación", pct: 25, savings: false },
+  { name: "Transporte", pct: 15, savings: false },
+  { name: "Ocio", pct: 15, savings: false },
   { name: "Otros", pct: 10, savings: false },
 ]
 

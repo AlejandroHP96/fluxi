@@ -1,53 +1,14 @@
 import { useEffect, useState } from "react"
 import { createPortal } from "react-dom"
-import { ChevronRight, PiggyBank, Trash2, X } from "lucide-react"
+import { Trash2, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { newCategoryId, todayKey } from "../../utils/month"
-import { EMPTY_WALLET } from "../../utils/wallet"
 import { walletBalance, type Wallet } from "../../types/budget"
 import { parseAmount, shortDate } from "./helpers"
 
-interface WalletCardProps {
-  wallet: Wallet | null
-  onSave: (w: Wallet) => Promise<boolean>
-}
-
-// Cartera de ahorros: aparte de los sobres. Saldo inicial puesto a mano y movimientos que entran o salen
-export const WalletCard = ({ wallet, onSave }: WalletCardProps) => {
-  const [open, setOpen] = useState(false)
-  const balance = walletBalance(wallet)
-  const last = (wallet?.movements ?? []).slice(0, 3)
-
-  return (
-    <section>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="glass-panel flex w-full items-center gap-4 rounded-2xl p-4 text-left transition-colors hover:border-cyan-400/30"
-      >
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-400/12 text-cyan-300">
-          <PiggyBank className="h-5 w-5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-white/60">Cartera de ahorros</span>
-          <span className="block text-2xl font-bold tabular-nums tracking-tight">{fmt(balance)}</span>
-          {last.length > 0 ? (
-            <span className="block truncate text-xs text-white/50">
-              Último: {last[0].amount > 0 ? "+" : ""}
-              {fmt(last[0].amount)} · {last[0].note || "Movimiento"}
-            </span>
-          ) : (
-            <span className="block text-xs text-white/50">{wallet ? "Sin movimientos" : "Pon tu saldo para empezar"}</span>
-          )}
-        </span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-white/40" />
-      </button>
-      {open && <WalletModal wallet={wallet ?? EMPTY_WALLET} onSave={onSave} onClose={() => setOpen(false)} />}
-    </section>
-  )
-}
-
-const WalletModal = ({ wallet, onSave, onClose }: { wallet: Wallet; onSave: (w: Wallet) => Promise<boolean>; onClose: () => void }) => {
+// Cartera de ahorros (tarjeta «Ahorro» de arriba): aparte de los sobres. Saldo inicial puesto a mano y
+// movimientos que entran o salen
+export const WalletModal = ({ wallet, onSave, onClose }: { wallet: Wallet; onSave: (w: Wallet) => Promise<boolean>; onClose: () => void }) => {
   const [initial, setInitial] = useState(String(wallet.initial).replace(".", ","))
   const [form, setForm] = useState<{ amount: string; note: string; sign: 1 | -1 }>({ amount: "", note: "", sign: 1 })
   const [busy, setBusy] = useState(false)
