@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react"
-import { Undo2, Check, SkipForward, AlertTriangle } from "lucide-react"
+import { Undo2, Check, SkipForward, AlertTriangle, Plus } from "lucide-react"
 import { conceptKey } from "../../utils/categorize"
 import { fmt } from "../../utils/formatters"
 import { SKIP, type ImportItem } from "../../utils/importQueue"
+import { newCategoryId } from "../../utils/month"
 import type { BudgetApi } from "../../hooks/useBudget"
 import { CategoryChip } from "./CategoryChip"
 import { catColor, longDate, shortDate } from "./helpers"
@@ -24,7 +25,7 @@ interface ImportReviewProps {
 }
 
 export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: ImportReviewProps) => {
-  const { addExpense, deleteExpense, remember, categories } = budget
+  const { addExpense, deleteExpense, remember, categories, saveCategories } = budget
   const spendCats = categories.filter((c) => !c.savings)
   const [index, setIndex] = useState(0)
   const [decisions, setDecisions] = useState<Decision[]>([])
@@ -32,13 +33,37 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
   const [choice, setChoice] = useState<string | null>(queue[0].suggestion)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [newCat, setNewCat] = useState<string | null>(null) // nombre de la categoría que se está creando (null = cerrado)
 
   const item = queue[index]
+
+  // Crea una categoría de gasto sin salir de la revisión y la deja elegida. Al guardar el gasto, la memoria
+  // aprende el concepto con ella, así los próximos imports la proponen solos. Empieza con 0 %: el reparto se ajusta luego
+  const createCategory = async () => {
+    const name = (newCat ?? "").trim()
+    if (!name) return setError("Pon un nombre a la categoría.")
+    const existing = categories.find((c) => c.name.trim().toLowerCase() === name.toLowerCase())
+    if (existing?.savings) return setError(`«${existing.name}» es una categoría de ahorro.`)
+    if (existing) {
+      setChoice(existing.id)
+      setNewCat(null)
+      return setError(null)
+    }
+    const id = newCategoryId()
+    setSaving(true)
+    const ok = await saveCategories([...categories, { id, name, pct: 0, savings: false }])
+    setSaving(false)
+    if (!ok) return setError("No se pudo crear la categoría. Inténtalo de nuevo.")
+    setChoice(id)
+    setNewCat(null)
+    setError(null)
+  }
 
   const load = (i: number, c: string, ch: string | null) => {
     setIndex(i)
     setConcept(c)
     setChoice(ch)
+    setNewCat(null)
     setError(null)
   }
 
@@ -218,7 +243,63 @@ export const ImportReview = ({ queue, warning, budget, onFinish, onExit }: Impor
           Omitir
           <kbd className="hidden text-[10px] font-normal text-white/50 md:inline">0</kbd>
         </button>
+        {newCat === null && (
+          <button
+            type="button"
+            onClick={() => {
+              setNewCat("")
+              setError(null)
+            }}
+            className={`${chip} border-dashed border-cyan-400/40 text-cyan-200/90 hover:border-cyan-300 hover:text-cyan-100`}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Nueva categoría
+          </button>
+        )}
       </div>
+
+      {newCat !== null && (
+        <div className="mt-3 flex gap-2">
+          <input
+            autoFocus
+            value={newCat}
+            onChange={(e) => {
+              setNewCat(e.target.value)
+              setError(null)
+            }}
+            onKeyDown={(e) => {
+              // Enter crea la categoría y Esc cierra este campo (no confirman el gasto ni cierran la importación)
+              if (e.key === "Enter") {
+                e.preventDefault()
+                e.stopPropagation()
+                void createCategory()
+              } else if (e.key === "Escape") {
+                e.stopPropagation()
+                setNewCat(null)
+              }
+            }}
+            placeholder="Nombre de la categoría"
+            aria-label="Nombre de la nueva categoría"
+            maxLength={30}
+            className="glass-input min-w-0 flex-1 rounded-xl px-3.5 py-2.5 text-base"
+          />
+          <button
+            type="button"
+            onClick={() => void createCategory()}
+            disabled={saving}
+            className="liquid-button shrink-0 rounded-xl px-4 py-2.5 text-sm font-semibold text-[#04202a] disabled:opacity-60"
+          >
+            Crear
+          </button>
+          <button
+            type="button"
+            onClick={() => setNewCat(null)}
+            className="shrink-0 rounded-xl border border-white/20 px-3 py-2.5 text-sm text-white/75 hover:bg-white/[0.08]"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
 
       {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
 
