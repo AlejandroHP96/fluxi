@@ -176,21 +176,37 @@ const DEMO_SAMPLE: Array<[number, string, string, number]> = [
   [27, "Café y desayuno", "Ocio", 7.5],
 ]
 
+// Variación del gasto en los 5 meses anteriores (del más antiguo al último), para que el historial no sea plano
+const DEMO_PAST_FACTORS = [0.82, 1.08, 0.93, 1.17, 0.88]
+
 function demoData() {
   const today = new Date()
   const categories: BudgetCategory[] = CATEGORY_TEMPLATE.map((c) => ({ ...c, id: newCategoryId() }))
   const idOf = (name: string) => categories.find((c) => c.name === name)!.id
-  const expenses: Expense[] = DEMO_SAMPLE.filter(([d]) => d <= today.getDate())
-    .reverse() // más recientes primero, como la lista real
-    .map(([d, concept, category, amount]) => ({
-      id: newCategoryId(),
-      userId: DEMO_UID,
-      concept,
-      category: idOf(category),
-      amount,
-      date: toDateKey(new Date(today.getFullYear(), today.getMonth(), d)),
-    }))
-  return { categories, expenses, income: { [toMonthKey(today)]: 1800 } as Record<string, number> }
+  const expenses: Expense[] = []
+  const income: Record<string, number> = {}
+  // 5 meses completos anteriores y el mes actual hasta hoy
+  for (let back = 5; back >= 0; back--) {
+    const first = new Date(today.getFullYear(), today.getMonth() - back, 1)
+    const lastDay = back === 0 ? today.getDate() : new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate()
+    const factor = back === 0 ? 1 : DEMO_PAST_FACTORS[5 - back]
+    income[toMonthKey(first)] = 1800
+    for (const [d, concept, category, amount] of DEMO_SAMPLE) {
+      if (d > lastDay) continue
+      // Alquiler y suscripciones no cambian; el resto varía con el mes
+      const fixed = concept === "Alquiler (parte)" || concept === "Spotify"
+      expenses.push({
+        id: newCategoryId(),
+        userId: DEMO_UID,
+        concept,
+        category: idOf(category),
+        amount: fixed ? amount : Math.round(amount * factor * 100) / 100,
+        date: toDateKey(new Date(first.getFullYear(), first.getMonth(), d)),
+      })
+    }
+  }
+  expenses.sort((x, y) => y.date.localeCompare(x.date)) // más recientes primero, como la lista real
+  return { categories, expenses, income }
 }
 
 // Cuenta demo: todo vive en memoria. Se puede probar la app entera, pero nada se guarda en Firestore
