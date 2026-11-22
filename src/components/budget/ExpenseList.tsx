@@ -2,7 +2,8 @@ import { useMemo, useState } from "react"
 import { Plus, Search, Undo2, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { resolveCategory, todayKey } from "../../utils/month"
-import { netAmount, type BudgetCategory, type Expense } from "../../types/budget"
+import { netAmount, type BudgetCategory, type Expense, type Members } from "../../types/budget"
+import { authorName, isShared } from "../../utils/members"
 import { catColor, dayLabel } from "./helpers"
 
 interface ExpenseListProps {
@@ -11,9 +12,11 @@ interface ExpenseListProps {
   loading: boolean
   onSelect: (e: Expense) => void
   onAdd: () => void
+  members: Members // presupuesto compartido: con más de un miembro se enseña quién apuntó cada gasto
 }
 
-export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: ExpenseListProps) => {
+export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, members }: ExpenseListProps) => {
+  const shared = isShared(members)
   const [search, setSearch] = useState("")
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
 
@@ -31,10 +34,11 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
         const cat = resolveCategory(e.category, categories)
         const catName = cat?.name.toLowerCase() ?? "sin categoría"
         return e.concept.toLowerCase().includes(q) || catName.includes(q)
+          || (shared && (authorName(e, members) ?? "").toLowerCase().includes(q))
       })
     }
     return list
-  }, [expenses, categories, search, selectedCat])
+  }, [expenses, categories, search, selectedCat, shared, members])
 
   const groups = useMemo(() => {
     const map = new Map<string, Expense[]>()
@@ -77,7 +81,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar por comercio o concepto…"
+              placeholder={shared ? "Buscar por comercio, concepto o quién…" : "Buscar por comercio o concepto…"}
               className="glass-input w-full rounded-xl py-2 pl-9 pr-8 text-sm"
             />
             {search && (
@@ -167,6 +171,15 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd }: 
                           <span className="block truncate text-sm font-medium text-white/95">{e.concept}</span>
                           <span className="block text-xs text-white/50">{cat?.name ?? "Sin categoría"}</span>
                         </span>
+                        {shared && (
+                          // Inicial de quien lo apuntó
+                          <span
+                            title={authorName(e, members) ?? undefined}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[10px] font-semibold text-white/70"
+                          >
+                            {(authorName(e, members) ?? "?").charAt(0).toUpperCase()}
+                          </span>
+                        )}
                         {e.refunds?.length ? (
                           // Con devoluciones: lo que te ha costado y, debajo, el importe original tachado
                           <span className="shrink-0 text-right">

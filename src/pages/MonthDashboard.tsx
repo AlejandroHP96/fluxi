@@ -5,6 +5,7 @@ import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey
 import { disconnectBank, finishBankConnection, takeBankRedirect } from "../utils/bankClient"
 import type { Expense } from "../types/budget"
 import { DEMO_EMAIL } from "../constants/demo"
+import { authorshipLabel } from "../utils/members"
 import { AppHeader } from "../components/budget/AppHeader"
 import { MonthNav } from "../components/budget/MonthNav"
 import { BentoKpis } from "../components/budget/BentoKpis"
@@ -61,6 +62,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
     [expenses, income, categories, fixedExpenses, month]
   )
 
+  // Gasto que se edita, el actual del listado (llega actualizado), no la copia de cuando se abrió
+  const editingExpense = modal?.kind === "edit" ? (expenses.find((x) => x.id === modal.expense.id) ?? modal.expense) : null
   const closeModal = () => setModal(null)
   const openNew = () => setModal({ kind: "new" })
   const openSettings = (tab: "categories" | "fixed" = "categories") => setSettingsTab(tab)
@@ -93,7 +96,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
     <AppHeader
       email={email}
       onSignOut={onSignOut}
-      onImport={() => setImporting(true)}
+      // Importar y «Borrar todos mis datos» solo para el dueño del presupuesto (usan su banco y su Ventajón)
+      onImport={budget.isOwner ? () => setImporting(true) : undefined}
       onCategories={() => openSettings("categories")}
     />
   )
@@ -200,6 +204,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
               loading={loading}
               onSelect={(e) => setModal({ kind: "edit", expense: e })}
               onAdd={openNew}
+              members={budget.members}
             />
           </div>
         </div>
@@ -240,11 +245,15 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
             onSave={saveCategories}
             onSaveFixedExpenses={saveFixedExpenses}
             onReassign={reassignExpenses}
-            onResetAll={async () => {
-              // Primero se revoca el acceso al banco (si falla, se borra igual)
-              if (budget.bank) await disconnectBank(budget.bank)
-              return budget.resetAll()
-            }}
+            onResetAll={
+              budget.isOwner
+                ? async () => {
+                    // Primero se revoca el acceso al banco (si falla, se borra igual)
+                    if (budget.bank) await disconnectBank(budget.bank)
+                    return budget.resetAll()
+                  }
+                : undefined
+            }
             onClose={closeSettings}
           />
         </Suspense>
@@ -253,7 +262,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       {modal && (
         <Suspense fallback={null}>
           <ExpenseModal
-            expense={modal.kind === "edit" ? (expenses.find((x) => x.id === modal.expense.id) ?? modal.expense) : null}
+            expense={editingExpense}
+            authorship={editingExpense ? authorshipLabel(editingExpense, budget.members) : null}
             month={month}
             categories={categories}
             onManageCategories={() => openSettings("categories")}

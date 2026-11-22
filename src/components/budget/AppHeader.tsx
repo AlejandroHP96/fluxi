@@ -4,7 +4,7 @@ import { ZkLogo } from "../brand/ZkLogo"
 interface AppHeaderProps {
   email: string | null
   onSignOut: () => void
-  onImport: () => void
+  onImport?: () => void // sin él no hay botón (miembro de un presupuesto compartido)
   onCategories: () => void
 }
 
@@ -25,14 +25,16 @@ export const AppHeader = ({ email, onSignOut, onImport, onCategories }: AppHeade
           <SlidersHorizontal className="h-3.5 w-3.5" />
           <span>Reparto</span>
         </button>
-        <button
-          onClick={onImport}
-          className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-cyan-400/40 hover:text-white"
-        >
-          <Upload className="h-3.5 w-3.5" />
-          <span className="sm:hidden">Importar</span>
-          <span className="hidden sm:inline">Importar CSV</span>
-        </button>
+        {onImport && (
+          <button
+            onClick={onImport}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 text-xs font-medium text-white/70 transition-colors hover:border-cyan-400/40 hover:text-white"
+          >
+            <Upload className="h-3.5 w-3.5" />
+            <span className="sm:hidden">Importar</span>
+            <span className="hidden sm:inline">Importar CSV</span>
+          </button>
+        )}
         <button
           onClick={onSignOut}
           aria-label="Cerrar sesión"

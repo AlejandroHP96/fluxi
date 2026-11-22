@@ -18,10 +18,11 @@ interface ExpenseModalProps {
   onDelete?: () => Promise<boolean>
   onSaveRefunds?: (refunds: Refund[]) => Promise<boolean> // solo al editar
   onClose: () => void
+  authorship?: string | null // «Apuntado por X · editado por Y» (presupuesto compartido)
 }
 
 export const ExpenseModal = ({
-  expense, month, categories, onManageCategories, defaultDate, onSave, onDelete, onSaveRefunds, onClose,
+  expense, month, categories, onManageCategories, defaultDate, onSave, onDelete, onSaveRefunds, onClose, authorship,
 }: ExpenseModalProps) => {
   const editing = expense !== null
   const spendCats = categories.filter((c) => !c.savings)
@@ -152,7 +153,10 @@ export const ExpenseModal = ({
         className="glass-panel fade-up max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-3xl sm:p-6"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">{editing ? "Editar gasto" : "Apuntar gasto"}</h2>
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold tracking-tight">{editing ? "Editar gasto" : "Apuntar gasto"}</h2>
+            {editing && authorship && <p className="mt-0.5 text-xs text-white/50">{authorship}</p>}
+          </div>
           <button
             type="button"
             onClick={onClose}
