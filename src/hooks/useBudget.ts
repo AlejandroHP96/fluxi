@@ -20,39 +20,34 @@ const cleanCategory = (c: BudgetCategory): BudgetCategory => {
 // gastos fijos y cartera. authUid es quien ha iniciado sesión; el presupuesto
 // es el suyo o, si su cuenta está enlazada a otra (links/{uid}), el de esa otra cuenta
 const useFirestoreBudget = (authUid: string | undefined) => {
-  // Si no se puede leer el enlace (p. ej. reglas aún sin desplegar), se usa el presupuesto propio
+  // Qué presupuesto se carga: nunca el propio por descarte. Solo el que confirma el servidor (links/{uid}) o el
+  // que se resolvió la última vez en este dispositivo; mientras tanto se espera (si no, una miembro con mala
+  // conexión veía su presupuesto vacío y la bienvenida en vez del compartido)
   const [link, setLink] = useState<{ uid: string; budget: string | null } | null>(null)
+  const [linkError, setLinkError] = useState<string | null>(null)
   useEffect(() => {
     setLink(null)
+    setLinkError(null)
     if (!authUid) return
-    // Presupuesto resuelto la última vez en este dispositivo: con él se carga al momento desde la caché
     const key = `fluxi:budget:${authUid}`
     let remembered: string | null = null
     try { remembered = localStorage.getItem(key) } catch { /* sin almacenamiento */ }
     const use = (budget: string | null) => setLink({ uid: authUid, budget: budget === authUid ? null : budget })
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const unsub = onSnapshot(
+    return onSnapshot(
       doc(db, "links", authUid),
       { includeMetadataChanges: true },
       (s) => {
-        // «No hay enlace» de la caché puede estar desfasado (enlazada después): se usa lo recordado o se espera
-        // al servidor, como mucho 3 s (sin red de verdad no llegaría nunca)
+        // «No hay enlace» sacado de la caché no vale (puede estar desfasado): lo recordado o esperar al servidor
         if (!s.exists() && s.metadata.fromCache) {
           if (remembered) use(remembered)
-          else timer ??= setTimeout(() => use(null), 3000)
           return
         }
-        clearTimeout(timer)
         const budget = (s.data()?.budget as string | undefined) ?? null
         try { localStorage.setItem(key, budget ?? authUid) } catch { /* sin almacenamiento */ }
         use(budget)
       },
-      () => use(null)
+      (e) => setLinkError(`No se ha podido saber qué presupuesto cargar (${e.message}). Recarga la app.`)
     )
-    return () => {
-      clearTimeout(timer)
-      unsub()
-    }
   }, [authUid])
   // uid del presupuesto (el dueño); undefined mientras se resuelve el enlace
   const userId = authUid && link?.uid === authUid ? (link.budget ?? authUid) : undefined
@@ -236,7 +231,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     })
 
   return {
-    expenses, categories, fixedExpenses, income, wallet, loading, error,
+    expenses, categories, fixedExpenses, income, wallet, loading, error: error ?? linkError,
     // Presupuesto compartido: miembros (uid -> nombre), quién ha iniciado sesión y si es el dueño
     members, currentUid: authUid ?? null, isOwner: !!userId && userId === authUid,
     addExpense, updateExpense, deleteExpense, reassignExpenses, saveRefunds, saveWallet,
