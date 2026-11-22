@@ -9,6 +9,8 @@ export interface Expense {
   category: string // id de BudgetCategory (los gastos antiguos pueden traer el nombre: se resuelve por nombre)
   date: string // "YYYY-MM-DD"
   refunds?: Refund[] // devoluciones de este gasto (compras en conjunto que te devuelven)
+  createdBy?: string // uid de quien lo apuntó (los antiguos no lo tienen: son del dueño, userId)
+  updatedBy?: string // uid de quien lo editó por última vez
 }
 
 // Dinero que te devuelven de un gasto. Si vuelve al mes, resta de lo gastado en su categoría;
@@ -107,3 +109,6 @@ export interface MonthSummary {
   uncategorized: number // € gastados en categorías que ya no existen
   count: number
 }
+
+// Miembros del presupuesto compartido (budgets/{uid}.members): uid -> nombre. Lo escribe solo el script de enlace
+export type Members = Record<string, string>
