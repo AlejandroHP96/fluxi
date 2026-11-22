@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react"
 import {
   onAuthStateChanged,
-  createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut as firebaseSignOut,
@@ -21,15 +20,6 @@ export const useAuth = () => {
     })
     return () => unsub()
   }, [])
-
-  const signUp = async (email: string, password: string): Promise<AuthResult> => {
-    try {
-      await createUserWithEmailAndPassword(auth, email, password)
-      return { error: null }
-    } catch (e) {
-      return { error: e as Error }
-    }
-  }
 
   const signIn = async (email: string, password: string): Promise<AuthResult> => {
     try {
@@ -52,5 +42,5 @@ export const useAuth = () => {
 
   const signOut = () => firebaseSignOut(auth)
 
-  return { user, loading, signUp, signIn, signOut, resetPassword }
+  return { user, loading, signIn, signOut, resetPassword }
 }

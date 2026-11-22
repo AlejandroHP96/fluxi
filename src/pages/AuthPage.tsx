@@ -5,9 +5,7 @@ import { DEMO_EMAIL, DEMO_PASSWORD } from "../constants/demo"
 import { ZkLogo } from "../components/brand/ZkLogo"
 
 const FIREBASE_ERRORS: Record<string, string> = {
-  "auth/email-already-in-use":  "Este email ya está registrado.",
   "auth/invalid-email":         "Email no válido.",
-  "auth/weak-password":         "La contraseña debe tener al menos 6 caracteres.",
   "auth/user-not-found":        "No existe una cuenta con este email.",
   "auth/wrong-password":        "Contraseña incorrecta.",
   "auth/invalid-credential":    "Email o contraseña incorrectos.",
@@ -17,13 +15,13 @@ const FIREBASE_ERRORS: Record<string, string> = {
 
 interface AuthPageProps {
   onSignIn: (email: string, password: string) => Promise<AuthResult>
-  onSignUp: (email: string, password: string) => Promise<AuthResult>
   onResetPassword: (email: string) => Promise<AuthResult>
 }
 
-type AuthMode = "login" | "signup" | "reset"
+// Sin registro: las cuentas se crean a mano (el registro público está cerrado en Firebase)
+type AuthMode = "login" | "reset"
 
-const AuthPage = ({ onSignIn, onSignUp, onResetPassword }: AuthPageProps) => {
+const AuthPage = ({ onSignIn, onResetPassword }: AuthPageProps) => {
   const [mode, setMode]       = useState<AuthMode>("login")
   const [email, setEmail]     = useState("")
   const [password, setPass]   = useState("")
@@ -36,14 +34,8 @@ const AuthPage = ({ onSignIn, onSignUp, onResetPassword }: AuthPageProps) => {
     if (!email || !password) { setErr("Completa todos los campos."); return }
     setLoading(true); setErr(""); setMsg("")
 
-    if (mode === "login") {
-      const { error } = await onSignIn(email, password)
-      if (error) setErr(FIREBASE_ERRORS[(error as FirebaseError).code] ?? error.message)
-    } else {
-      const { error } = await onSignUp(email, password)
-      if (error) setErr(FIREBASE_ERRORS[(error as FirebaseError).code] ?? error.message)
-      else setMsg("¡Cuenta creada! Ya puedes empezar.")
-    }
+    const { error } = await onSignIn(email, password)
+    if (error) setErr(FIREBASE_ERRORS[(error as FirebaseError).code] ?? error.message)
     setLoading(false)
   }
 
@@ -71,7 +63,6 @@ const AuthPage = ({ onSignIn, onSignUp, onResetPassword }: AuthPageProps) => {
     setErr("")
     setMsg("")
   }
-  const toggleMode = () => goTo(mode === "login" ? "signup" : "login")
 
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex items-center justify-center p-4">
@@ -82,7 +73,7 @@ const AuthPage = ({ onSignIn, onSignUp, onResetPassword }: AuthPageProps) => {
         </div>
         <div className="glass-panel rounded-3xl p-7">
           <h2 className="text-base font-semibold mb-6">
-            {mode === "login" ? "Iniciar sesión" : mode === "signup" ? "Crear cuenta" : "Recuperar contraseña"}
+            {mode === "login" ? "Iniciar sesión" : "Recuperar contraseña"}
           </h2>
           <div className="mb-4">
             <label className="block text-xs text-white/60 mb-1">Email</label>
@@ -98,18 +89,16 @@ const AuthPage = ({ onSignIn, onSignUp, onResetPassword }: AuthPageProps) => {
               <input type="password" value={password} onChange={(e) => setPass(e.target.value)}
                 placeholder="••••••••" onKeyDown={(e) => e.key === "Enter" && handle()}
                 className="glass-input rounded-xl w-full px-3 py-2 text-sm" />
-              {mode === "login" && (
-                <button type="button" onClick={() => goTo("reset")} className="mt-2 text-xs text-cyan-300 hover:underline">
-                  ¿Olvidaste la contraseña?
-                </button>
-              )}
+              <button type="button" onClick={() => goTo("reset")} className="mt-2 text-xs text-cyan-300 hover:underline">
+                ¿Olvidaste la contraseña?
+              </button>
             </div>
           )}
           {err && <p className="text-red-400 text-xs mb-4">{err}</p>}
           {msg && <p className="text-emerald-400 text-xs mb-4">{msg}</p>}
           <button onClick={handle} disabled={loading}
             className={`liquid-button rounded-xl font-semibold text-[#04202a] w-full py-2.5 text-sm transition-opacity mb-4 ${loading ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
-            {loading ? "Cargando..." : mode === "login" ? "Entrar" : mode === "signup" ? "Registrarse" : "Enviar enlace"}
+            {loading ? "Cargando..." : mode === "login" ? "Entrar" : "Enviar enlace"}
           </button>
           {mode === "login" && (
             <button onClick={handleTester} disabled={loading}
@@ -117,17 +106,10 @@ const AuthPage = ({ onSignIn, onSignUp, onResetPassword }: AuthPageProps) => {
               Entrar como Tester
             </button>
           )}
-          {mode === "reset" ? (
+          {mode === "reset" && (
             <p className="text-center text-xs text-white/60">
               <button onClick={() => goTo("login")} className="text-cyan-300 hover:underline">Volver a iniciar sesión</button>
             </p>
-          ) : (
-          <p className="text-center text-xs text-white/60">
-            {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}
-            <button onClick={toggleMode} className="text-cyan-300 hover:underline">
-              {mode === "login" ? "Regístrate" : "Inicia sesión"}
-            </button>
-          </p>
           )}
         </div>
       </div>
