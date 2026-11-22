@@ -28,12 +28,16 @@ export function lockCredential(uid: string): string | null {
   }
 }
 
-// Hay huella / Face ID / Windows Hello en este dispositivo
-export async function biometricAvailable(): Promise<boolean> {
+// ¿Hay huella / Face ID / Windows Hello en este dispositivo? null = sí; si no, el motivo (se enseña al usuario)
+export async function biometricUnavailableReason(): Promise<string | null> {
+  if (!window.isSecureContext) return "la página no se ha abierto con https"
+  if (!window.PublicKeyCredential) return "este navegador no admite passkeys (WebAuthn)"
   try {
-    return !!window.PublicKeyCredential && (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
-  } catch {
-    return false
+    return (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())
+      ? null
+      : "el navegador dice que el dispositivo no tiene huella / Face ID configurados"
+  } catch (e) {
+    return `no se ha podido comprobar (${(e as Error).message})`
   }
 }
 

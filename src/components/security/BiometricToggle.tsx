@@ -1,28 +1,27 @@
 import { useEffect, useState } from "react"
 import { Fingerprint } from "lucide-react"
-import { biometricAvailable, disableLock, enableLock, lockCredential } from "../../utils/biometricLock"
+import { biometricUnavailableReason, disableLock, enableLock, lockCredential } from "../../utils/biometricLock"
 
 interface BiometricToggleProps {
   uid: string
   email: string
 }
 
-// Interruptor «Desbloquear con huella / Face ID» de este dispositivo. No aparece si no hay biometría
+// Interruptor «Desbloquear con huella / Face ID» de este dispositivo. Sin biometría se queda desactivado y dice por qué
 export const BiometricToggle = ({ uid, email }: BiometricToggleProps) => {
-  const [available, setAvailable] = useState(false)
+  // undefined = comprobando; null = disponible; texto = motivo por el que no lo está
+  const [unavailable, setUnavailable] = useState<string | null | undefined>(undefined)
   const [enabled, setEnabled] = useState(() => lockCredential(uid) !== null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
-    void biometricAvailable().then((ok) => alive && setAvailable(ok))
+    void biometricUnavailableReason().then((reason) => alive && setUnavailable(reason))
     return () => {
       alive = false
     }
   }, [])
-
-  if (!available) return null
 
   const toggle = async () => {
     setError(null)
@@ -49,13 +48,15 @@ export const BiometricToggle = ({ uid, email }: BiometricToggleProps) => {
         <Fingerprint className="h-5 w-5 shrink-0 text-cyan-300" />
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-medium text-white/90">Desbloquear con huella / Face ID</span>
-          <span className="block text-xs text-white/50">Se pide al abrir Fluxi y al volver tras 5 minutos fuera.</span>
+          <span className="block text-xs text-white/50">
+            {unavailable ? `No disponible: ${unavailable}.` : "Se pide al abrir Fluxi y al volver tras 5 minutos fuera."}
+          </span>
         </span>
         <input
           type="checkbox"
           role="switch"
           checked={enabled}
-          disabled={busy}
+          disabled={busy || (!enabled && unavailable !== null)}
           onChange={() => void toggle()}
           className="h-5 w-5 shrink-0 accent-cyan-400"
         />
