@@ -23,7 +23,8 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   // Qué presupuesto se carga: nunca el propio por descarte. Solo el que confirma el servidor (links/{uid}) o el
   // que se resolvió la última vez en este dispositivo; mientras tanto se espera (si no, una miembro con mala
   // conexión veía su presupuesto vacío y la bienvenida en vez del compartido)
-  const [link, setLink] = useState<{ uid: string; budget: string | null } | null>(null)
+  // confirmed: lo ha dicho el servidor (no la caché ni lo recordado)
+  const [link, setLink] = useState<{ uid: string; budget: string | null; confirmed: boolean } | null>(null)
   const [linkError, setLinkError] = useState<string | null>(null)
   useEffect(() => {
     setLink(null)
@@ -32,19 +33,20 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     const key = `fluxi:budget:${authUid}`
     let remembered: string | null = null
     try { remembered = localStorage.getItem(key) } catch { /* sin almacenamiento */ }
-    const use = (budget: string | null) => setLink({ uid: authUid, budget: budget === authUid ? null : budget })
+    const use = (budget: string | null, confirmed: boolean) =>
+      setLink({ uid: authUid, budget: budget === authUid ? null : budget, confirmed })
     return onSnapshot(
       doc(db, "links", authUid),
       { includeMetadataChanges: true },
       (s) => {
         // «No hay enlace» sacado de la caché no vale (puede estar desfasado): lo recordado o esperar al servidor
         if (!s.exists() && s.metadata.fromCache) {
-          if (remembered) use(remembered)
+          if (remembered) use(remembered, false)
           return
         }
         const budget = (s.data()?.budget as string | undefined) ?? null
         try { localStorage.setItem(key, budget ?? authUid) } catch { /* sin almacenamiento */ }
-        use(budget)
+        use(budget, !s.metadata.fromCache)
       },
       (e) => setLinkError(`No se ha podido saber qué presupuesto cargar (${e.message}). Recarga la app.`)
     )
@@ -232,6 +234,8 @@ const useFirestoreBudget = (authUid: string | undefined) => {
 
   return {
     expenses, categories, fixedExpenses, income, wallet, loading, error: error ?? linkError,
+    // El servidor ha confirmado qué presupuesto es: hasta entonces no se ofrece crear uno (bienvenida)
+    budgetConfirmed: !!authUid && link?.uid === authUid && link.confirmed,
     // Presupuesto compartido: miembros (uid -> nombre), quién ha iniciado sesión y si es el dueño
     members, currentUid: authUid ?? null, isOwner: !!userId && userId === authUid,
     addExpense, updateExpense, deleteExpense, reassignExpenses, saveRefunds, saveWallet,
@@ -332,7 +336,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
 
   return {
     expenses, categories, fixedExpenses, income, wallet, loading: false, error: null,
-    members: {}, currentUid: DEMO_UID, isOwner: true,
+    members: {}, currentUid: DEMO_UID, isOwner: true, budgetConfirmed: true,
     addExpense: async (e: NewExpense) => {
       const id = newCategoryId()
       setExpenses((l) => sortList([{ ...e, amount: Math.abs(Number(e.amount)), id, userId: DEMO_UID }, ...l]))

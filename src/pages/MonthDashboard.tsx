@@ -64,7 +64,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   const closeSettings = () => setSettingsTab(null)
   // Gasto nuevo: hoy si estás en el mes actual; si no, el día 1 del mes que miras
   const defaultDate = summary.isCurrent ? todayKey() : `${month}-01`
-  const firstTime = !loading && categories.length === 0
+  // La bienvenida crea un presupuesto: solo si el servidor ha confirmado cuál es (nunca por un enlace sin resolver)
+  const firstTime = !loading && budget.budgetConfirmed && categories.length === 0
 
   const header = (
     <AppHeader
