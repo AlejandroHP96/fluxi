@@ -8,8 +8,6 @@ import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
 import type { BudgetCategory, Expense, FixedExpense, Members, NewExpense, Refund, Wallet } from "../types/budget"
 import { syncRefundMoves } from "../utils/wallet"
-import type { CategoryMemory } from "../utils/importQueue"
-import type { BankSession } from "../utils/bankClient"
 
 // Categoría lista para guardar: los sobres en € llevan amount (y pct 0); los de % no llevan la clave
 // (Firestore no admite campos undefined)
@@ -18,8 +16,8 @@ const cleanCategory = (c: BudgetCategory): BudgetCategory => {
   return typeof c.amount === "number" ? { ...base, pct: 0, amount: Math.max(0, Math.round(c.amount * 100) / 100) } : base
 }
 
-// Gastos (colección "expenses") y ajustes del presupuesto en budgets/{uid}: categorías con %, nómina de cada
-// mes y la memoria de categorías elegidas al importar. authUid es quien ha iniciado sesión; el presupuesto
+// Gastos (colección "expenses") y ajustes del presupuesto en budgets/{uid}: categorías, nómina de cada mes,
+// gastos fijos y cartera. authUid es quien ha iniciado sesión; el presupuesto
 // es el suyo o, si su cuenta está enlazada a otra (links/{uid}), el de esa otra cuenta
 const useFirestoreBudget = (authUid: string | undefined) => {
   // Si no se puede leer el enlace (p. ej. reglas aún sin desplegar), se usa el presupuesto propio
@@ -63,8 +61,6 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   const [categories, setCategories] = useState<BudgetCategory[]>([])
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
   const [income, setIncomeMap] = useState<Record<string, number>>({})
-  const [memory, setMemory] = useState<CategoryMemory>({})
-  const [bank, setBank] = useState<BankSession | null>(null)
   const [wallet, setWallet] = useState<Wallet | null>(null)
   const [members, setMembers] = useState<Members>({})
   const [loading, setLoading] = useState(true)
@@ -76,8 +72,6 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     setCategories([])
     setFixedExpenses([])
     setIncomeMap({})
-    setMemory({})
-    setBank(null)
     setWallet(null)
     setMembers({})
     setError(null)
@@ -123,8 +117,6 @@ const useFirestoreBudget = (authUid: string | undefined) => {
       setCategories((data?.categories as BudgetCategory[] | undefined) ?? [])
       setFixedExpenses((data?.fixedExpenses as FixedExpense[] | undefined) ?? [])
       setIncomeMap((data?.income as Record<string, number> | undefined) ?? {})
-      setMemory((data?.memory as CategoryMemory | undefined) ?? {})
-      setBank((data?.bank as BankSession | undefined) ?? null)
       setWallet((data?.wallet as Wallet | undefined) ?? null)
       setMembers((data?.members as Members | undefined) ?? {})
       markLoaded("settings")
@@ -229,16 +221,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
       fixedExpenses: list.map((f) => ({ id: f.id || newCategoryId(), name: f.name.trim(), amount: Math.abs(Number(f.amount)) || 0 })),
     }, { merge: true }))
 
-  // Recuerda la categoría (id) o SKIP elegida para un concepto al importar. merge: true fusiona el mapa,
-  // así varias elecciones seguidas no se pisan aunque el estado local aún no se haya actualizado
-  const remember = (key: string, choice: string) =>
-    run(() => setDoc(settingsRef(), { userId, memory: { [key]: choice } }, { merge: true }))
-
-  // Conexión con el banco (sesión de Enable Banking guardada en budgets/{uid}.bank); null la desconecta
-  const saveBank = (b: BankSession | null) =>
-    run(() => setDoc(settingsRef(), { userId, bank: b ?? deleteField() }, { merge: true }))
-
-  // Empezar de cero: borra todos los gastos y el documento de ajustes (categorías, nóminas, fijos, memoria y banco)
+  // Empezar de cero: borra todos los gastos y el documento de ajustes (categorías, nóminas, fijos y cartera)
   const resetAll = () =>
     run(async () => {
       const ids = expenses.map((e) => e.id)
@@ -253,11 +236,11 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     })
 
   return {
-    expenses, categories, fixedExpenses, income, memory, bank, wallet, loading, error,
+    expenses, categories, fixedExpenses, income, wallet, loading, error,
     // Presupuesto compartido: miembros (uid -> nombre), quién ha iniciado sesión y si es el dueño
     members, currentUid: authUid ?? null, isOwner: !!userId && userId === authUid,
     addExpense, updateExpense, deleteExpense, reassignExpenses, saveRefunds, saveWallet,
-    setIncome, saveCategories, saveFixedExpenses, remember, saveBank, resetAll,
+    setIncome, saveCategories, saveFixedExpenses, resetAll,
   }
 }
 
@@ -333,7 +316,6 @@ const useDemoBudget = (active: boolean): BudgetApi => {
   const [categories, setCategories] = useState<BudgetCategory[]>(initial.categories)
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
   const [income, setIncomeMap] = useState<Record<string, number>>(initial.income)
-  const [memory, setMemory] = useState<CategoryMemory>({})
   const [wallet, setWallet] = useState<Wallet | null>(null)
 
   // Al entrar de nuevo en la demo se parte de los datos de ejemplo (durante el render, sin un fotograma con lo anterior)
@@ -346,7 +328,6 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       setCategories(d.categories)
       setFixedExpenses([])
       setIncomeMap(d.income)
-      setMemory({})
       setWallet(null)
     }
   }
@@ -355,7 +336,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
   const ok = async () => true
 
   return {
-    expenses, categories, fixedExpenses, income, memory, wallet, loading: false, error: null,
+    expenses, categories, fixedExpenses, income, wallet, loading: false, error: null,
     members: {}, currentUid: DEMO_UID, isOwner: true,
     addExpense: async (e: NewExpense) => {
       const id = newCategoryId()
@@ -404,19 +385,11 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       setFixedExpenses(list.map((f) => ({ id: f.id || newCategoryId(), name: f.name.trim(), amount: Math.abs(Number(f.amount)) || 0 })))
       return ok()
     },
-    remember: (key: string, choice: string) => {
-      setMemory((m) => ({ ...m, [key]: choice }))
-      return ok()
-    },
-    // La demo no conecta bancos
-    bank: null,
-    saveBank: async () => true,
     resetAll: () => {
       setExpenses([])
       setCategories([])
       setFixedExpenses([])
       setIncomeMap({})
-      setMemory({})
       setWallet(null)
       return ok()
     },

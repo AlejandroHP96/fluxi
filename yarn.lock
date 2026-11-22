@@ -2261,19 +2261,12 @@
   resolved "https://registry.npmjs.org/@types/estree/-/estree-1.0.10.tgz"
   integrity sha512-lTyOMnOcmRBzdCv6/4zUZCrEhV0xrqQiUZBZtVcbmLHBXKLnN8q89v/wKRF/Q0HbwVsqbIG3o5HDoFl9sduM+g==
 
-"@types/node@*", "@types/node@>=12.12.47", "@types/node@>=13.7.0":
+"@types/node@>=12.12.47", "@types/node@>=13.7.0":
   version "20.19.41"
   resolved "https://registry.npmjs.org/@types/node/-/node-20.19.41.tgz"
   integrity sha512-ECymXOukMnOoVkC2bb1Vc/w/836DXncOg5m8Xj1RH7xSHZJWNYY6Zh7EH477vcnD5egKNNfy2RpNOmuChhFPgQ==
   dependencies:
     undici-types "~6.21.0"
-
-"@types/papaparse@^5.5.2":
-  version "5.5.2"
-  resolved "https://registry.npmjs.org/@types/papaparse/-/papaparse-5.5.2.tgz"
-  integrity sha512-gFnFp/JMzLHCwRf7tQHrNnfhN4eYBVYYI897CGX4MY1tzY9l2aLkVyx2IlKZ/SAqDbB3I1AOZW5gTMGGsqWliA==
-  dependencies:
-    "@types/node" "*"
 
 "@types/prop-types@*":
   version "15.7.15"
@@ -3812,11 +3805,6 @@ package-json-from-dist@^1.0.0:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/package-json-from-dist/-/package-json-from-dist-1.0.1.tgz#4f1471a010827a86f94cfd9b0727e36d267de505"
   integrity sha512-UEZIS3/by4OC8vL3P2dTXRETpebLI2NiI5vIrjaD/5UtrkFX/tNbwjTSRAGC/+7CAo2pIcBaRgWmcBBHcsaCIw==
-
-papaparse@^5.7.1:
-  version "5.7.1"
-  resolved "https://registry.npmjs.org/papaparse/-/papaparse-5.7.1.tgz"
-  integrity sha512-qOR+UDWv6D3hMxnWWOk0ZpBdCkd+kw5Yh7aXOaNSQU8A+73EA2bhW7EiUix/hY0yulUi5FRvt7PpYSI2VDvY0g==
 
 path-key@^3.1.0:
   version "3.1.1"

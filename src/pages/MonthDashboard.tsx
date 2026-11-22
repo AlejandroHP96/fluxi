@@ -1,8 +1,7 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, lazy, useMemo, useState } from "react"
 import { AlertTriangle, Plus } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
 import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
-import { disconnectBank, finishBankConnection, takeBankRedirect } from "../utils/bankClient"
 import type { Expense } from "../types/budget"
 import { DEMO_EMAIL } from "../constants/demo"
 import { authorshipLabel } from "../utils/members"
@@ -15,9 +14,6 @@ import { ExpenseList } from "../components/budget/ExpenseList"
 
 const ExpenseModal = lazy(() =>
   import("../components/budget/ExpenseModal").then((m) => ({ default: m.ExpenseModal }))
-)
-const ImportWizard = lazy(() =>
-  import("../components/budget/ImportWizard").then((m) => ({ default: m.ImportWizard }))
 )
 const CategorySettings = lazy(() =>
   import("../components/budget/CategorySettings").then((m) => ({ default: m.CategorySettings }))
@@ -33,11 +29,6 @@ interface MonthDashboardProps {
 }
 
 type ModalState = { kind: "new" } | { kind: "edit"; expense: Expense } | null
-
-// Espera a que el presupuesto esté cargado (máx. 15 s): antes no se sabe en cuál guardar
-const waitForBudget = async (ref: { current: BudgetApi }) => {
-  for (let i = 0; i < 150 && ref.current.loading; i++) await new Promise((r) => setTimeout(r, 100))
-}
 
 const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   const {
@@ -57,8 +48,6 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   } = budget
   const [month, setMonth] = useState(currentMonthKey)
   const [modal, setModal] = useState<ModalState>(null)
-  const [importing, setImporting] = useState(false)
-  const [bankError, setBankError] = useState<string | null>(null)
   const [settingsTab, setSettingsTab] = useState<"categories" | "fixed" | null>(null)
 
   const monthExpenses = useMemo(() => expenses.filter((e) => e.date.startsWith(month)), [expenses, month])
@@ -77,36 +66,10 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   const defaultDate = summary.isCurrent ? todayKey() : `${month}-01`
   const firstTime = !loading && categories.length === 0
 
-  // Vuelta del banco tras autorizar: cierra el círculo una sola vez (StrictMode monta dos veces).
-  // Se guarda con el budget más reciente: el del primer render aún no sabe qué presupuesto es
-  const budgetRef = useRef(budget)
-  budgetRef.current = budget
-  const bankRedirectDone = useRef(false)
-  useEffect(() => {
-    if (bankRedirectDone.current) return
-    bankRedirectDone.current = true
-    const redirect = takeBankRedirect()
-    if (!redirect) return
-    if ("error" in redirect) {
-      setBankError(redirect.error)
-      return
-    }
-    void finishBankConnection(redirect.code)
-      .then(async (session) => {
-        await waitForBudget(budgetRef)
-        if (!(await budgetRef.current.saveBank(session))) throw new Error("No se pudo guardar la conexión con el banco. Vuelve a conectarlo.")
-        setImporting(true)
-      })
-      .catch((e: unknown) => setBankError((e as Error).message))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
   const header = (
     <AppHeader
       email={email}
       onSignOut={onSignOut}
-      // Importar y «Borrar todos mis datos» solo para el dueño del presupuesto (usan su banco y su Ventajón)
-      onImport={budget.isOwner ? () => setImporting(true) : undefined}
       onCategories={() => openSettings("categories")}
     />
   )
@@ -118,13 +81,6 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
     </div>
   )
 
-  const bankErrorBanner = bankError && (
-    <div role="alert" className="flex items-start gap-2.5 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-      <span>{bankError}</span>
-    </div>
-  )
-
   // Primera vez: nómina + reparto propuesto
   if (firstTime) {
     return (
@@ -132,23 +88,12 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         {header}
         <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
           {errorBanner}
-          {bankErrorBanner}
           <Suspense fallback={null}>
             <FirstSetup
               month={month}
               onSubmit={async (cats, amount) => (await saveCategories(cats)) && (await setIncome(month, amount))}
             />
           </Suspense>
-          {importing && (
-            <Suspense fallback={null}>
-              <ImportWizard
-                budget={budget}
-                viewMonth={month}
-                onManageCategories={() => openSettings("categories")}
-                onClose={() => setImporting(false)}
-              />
-            </Suspense>
-          )}
         </main>
       </div>
     )
@@ -169,7 +114,6 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         />
 
         {errorBanner}
-        {bankErrorBanner}
 
         {email === DEMO_EMAIL && (
           <p className="rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-2.5 text-sm text-cyan-100">
@@ -230,20 +174,6 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
         </button>
       </div>
 
-      {importing && (
-        <Suspense fallback={null}>
-          <ImportWizard
-            budget={budget}
-            viewMonth={month}
-            onManageCategories={() => openSettings("categories")}
-            onClose={(imported) => {
-              setImporting(false)
-              if (imported) setMonth(imported)
-            }}
-          />
-        </Suspense>
-      )}
-
       {settingsTab && (
         <Suspense fallback={null}>
           <CategorySettings
@@ -254,15 +184,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
             onSave={saveCategories}
             onSaveFixedExpenses={saveFixedExpenses}
             onReassign={reassignExpenses}
-            onResetAll={
-              budget.isOwner
-                ? async () => {
-                    // Primero se revoca el acceso al banco (si falla, se borra igual)
-                    if (budget.bank) await disconnectBank(budget.bank)
-                    return budget.resetAll()
-                  }
-                : undefined
-            }
+            // «Borrar todos mis datos» solo para el dueño del presupuesto
+            onResetAll={budget.isOwner ? budget.resetAll : undefined}
             onClose={closeSettings}
           />
         </Suspense>

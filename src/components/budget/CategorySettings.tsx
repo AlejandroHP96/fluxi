@@ -246,8 +246,8 @@ export const CategorySettings = ({
           {resetting && (
             <div className="space-y-3 rounded-2xl border border-red-400/35 bg-red-500/[0.1] p-4 text-sm text-red-50">
               <p>
-                Se borrarán <strong>todos tus gastos</strong>, las categorías, las nóminas, los gastos fijos, las categorías recordadas y la
-                conexión con el banco. No se puede deshacer.
+                Se borrarán <strong>todos tus gastos</strong>, las categorías, las nóminas, los gastos fijos y la cartera de ahorros.
+                No se puede deshacer.
               </p>
               <label className="block">
                 <span className="text-white/75">Escribe {RESET_WORD} para confirmar</span>

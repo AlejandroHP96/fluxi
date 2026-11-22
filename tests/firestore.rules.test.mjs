@@ -40,12 +40,9 @@ await t("seed budget", assertSucceeds(setDoc(b, { userId: "u1", categories: [{ i
 await t("setIncome", assertSucceeds(setDoc(b, { userId: "u1", income: { "2026-10": 1700 } }, { merge: true })))
 await t("borrar income mes", assertSucceeds(setDoc(b, { userId: "u1", income: { "2026-10": deleteField() } }, { merge: true })))
 await t("fijos", assertSucceeds(setDoc(b, { userId: "u1", fixedExpenses: [{ id: "f", name: "Gym", amount: 30 }] }, { merge: true })))
-await t("memory", assertSucceeds(setDoc(b, { userId: "u1", memory: { "lidl": "a" } }, { merge: true })))
-const bank = { sessionId: "s1", validUntil: "2027-05-01T00:00:00Z", bankName: "Revolut", accounts: [{ uid: "a1", name: "EUR", iban: "LT00", currency: "EUR" }] }
-await t("guardar sesión del banco", assertSucceeds(setDoc(b, { userId: "u1", bank }, { merge: true })))
-await t("desconectar banco", assertSucceeds(setDoc(b, { userId: "u1", bank: deleteField() }, { merge: true })))
-await t("banco con campo extra", assertFails(setDoc(b, { userId: "u1", bank: { ...bank, token: "x" } }, { merge: true })))
-await t("banco no es mapa", assertFails(setDoc(b, { userId: "u1", bank: "abc" }, { merge: true })))
+// Sin importación: ni memoria de categorías ni conexión con el banco
+await t("memory ya no se admite", assertFails(setDoc(b, { userId: "u1", memory: { "lidl": "a" } }, { merge: true })))
+await t("bank ya no se admite", assertFails(setDoc(b, { userId: "u1", bank: { sessionId: "s1" } }, { merge: true })))
 const wallet = { initial: 500, movements: [{ id: "m1", amount: 30, note: "Devolución", date: "2026-11-20" }] }
 await t("guardar cartera", assertSucceeds(setDoc(b, { userId: "u1", wallet }, { merge: true })))
 await t("cartera con campo extra", assertFails(setDoc(b, { userId: "u1", wallet: { ...wallet, hack: 1 } }, { merge: true })))
@@ -119,10 +116,6 @@ await env.withSecurityRulesDisabled(async c => {
 })
 await t("miembro no edita sin firmar", assertFails(updateDoc(doc(m, "expenses/shared2"), { amount: 8 })))
 await t("dueño edita sin firmar (app antigua)", assertSucceeds(updateDoc(doc(u, "expenses/shared2"), { amount: 8 })))
-await t("dueño guarda el banco", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", bank }, { merge: true })))
-await t("miembro no toca el banco", assertFails(setDoc(doc(m, "budgets/u1"), { userId: "u1", bank: deleteField() }, { merge: true })))
-await t("miembro cambia otra cosa con banco puesto", assertSucceeds(setDoc(doc(m, "budgets/u1"), { userId: "u1", income: { "2026-12": 1 } }, { merge: true })))
-await t("dueño quita el banco", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", bank: deleteField() }, { merge: true })))
 await env.withSecurityRulesDisabled(async c => {
   const f = c.firestore()
   for (let i = 0; i < 25; i++) await setDoc(doc(f, `expenses/lote${i}`), { userId: "u1", amount: 1, concept: "x", category: "c1", date: "2026-11-21" })

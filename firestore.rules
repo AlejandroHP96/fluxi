@@ -43,7 +43,7 @@ service cloud.firestore {
         && (!changed.hasAny(['refunds']) || okRefunds(d));
     }
 
-    // Gastos apuntados a mano o importados del CSV de Revolut
+    // Gastos apuntados a mano
     match /expenses/{id} {
       allow read: if owns(resource.data);
       allow delete: if owns(resource.data) && notDemo();
@@ -62,16 +62,13 @@ service cloud.firestore {
         && (request.auth.uid == resource.data.userId || request.resource.data.get('updatedBy', null) == request.auth.uid);
     }
 
-    // Reparto (categories), nóminas por mes (income), gastos fijos, categorías recordadas al importar (memory)
-    // , la sesión del banco de Enable Banking (bank) y la cartera de ahorros (wallet: saldo inicial y movimientos)
+    // Reparto (categories), nóminas por mes (income), gastos fijos y la cartera de ahorros (wallet: saldo inicial y movimientos)
     // userId es el dueño del presupuesto (el uid del documento), también cuando escribe un miembro
     function validBudget(d, uid) {
       return d.userId == uid
         && (!('categories' in d) || (d.categories is list && d.categories.size() <= 50))
         && (!('fixedExpenses' in d) || (d.fixedExpenses is list && d.fixedExpenses.size() <= 50))
         && (!('income' in d) || (d.income is map && d.income.size() <= 600))
-        && (!('memory' in d) || (d.memory is map && d.memory.size() <= 3000))
-        && (!('bank' in d) || d.bank == null || (d.bank is map && d.bank.keys().hasOnly(['sessionId', 'validUntil', 'bankName', 'accounts'])))
         && (!('wallet' in d) || (d.wallet is map && d.wallet.keys().hasOnly(['initial', 'movements'])
               && (!('initial' in d.wallet) || d.wallet.initial is number)
               && (!('movements' in d.wallet) || (d.wallet.movements is list && d.wallet.movements.size() <= 2000))));
@@ -81,12 +78,10 @@ service cloud.firestore {
     match /budgets/{uid} {
       allow read: if canUse(uid);
       allow create: if request.auth != null && request.auth.uid == uid && notDemo()
-        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank', 'wallet'])
+        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet'])
         && validBudget(request.resource.data, uid);
       allow update: if canUse(uid) && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank', 'wallet'])
-        // La conexión con el banco es solo del dueño (usa sus cuentas)
-        && (request.auth.uid == uid || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['bank']))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet'])
         && validBudget(request.resource.data, uid);
       allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
     }
