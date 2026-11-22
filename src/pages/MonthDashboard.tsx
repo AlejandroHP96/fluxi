@@ -94,7 +94,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
     void finishBankConnection(redirect.code)
       .then(async (session) => {
         await waitForBudget(budgetRef)
-        await budgetRef.current.saveBank(session)
+        if (!(await budgetRef.current.saveBank(session))) throw new Error("No se pudo guardar la conexión con el banco. Vuelve a conectarlo.")
         setImporting(true)
       })
       .catch((e: unknown) => setBankError((e as Error).message))

@@ -27,16 +27,34 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   useEffect(() => {
     setLink(null)
     if (!authUid) return
-    return onSnapshot(
+    // Presupuesto resuelto la última vez en este dispositivo: con él se carga al momento desde la caché
+    const key = `fluxi:budget:${authUid}`
+    let remembered: string | null = null
+    try { remembered = localStorage.getItem(key) } catch { /* sin almacenamiento */ }
+    const use = (budget: string | null) => setLink({ uid: authUid, budget: budget === authUid ? null : budget })
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const unsub = onSnapshot(
       doc(db, "links", authUid),
       { includeMetadataChanges: true },
       (s) => {
-        // «No hay enlace» sacado de la caché puede estar desfasado (enlazada después): con red se espera al servidor
-        if (!s.exists() && s.metadata.fromCache && navigator.onLine) return
-        setLink({ uid: authUid, budget: (s.data()?.budget as string | undefined) ?? null })
+        // «No hay enlace» de la caché puede estar desfasado (enlazada después): se usa lo recordado o se espera
+        // al servidor, como mucho 3 s (sin red de verdad no llegaría nunca)
+        if (!s.exists() && s.metadata.fromCache) {
+          if (remembered) use(remembered)
+          else timer ??= setTimeout(() => use(null), 3000)
+          return
+        }
+        clearTimeout(timer)
+        const budget = (s.data()?.budget as string | undefined) ?? null
+        try { localStorage.setItem(key, budget ?? authUid) } catch { /* sin almacenamiento */ }
+        use(budget)
       },
-      () => setLink({ uid: authUid, budget: null })
+      () => use(null)
     )
+    return () => {
+      clearTimeout(timer)
+      unsub()
+    }
   }, [authUid])
   // uid del presupuesto (el dueño); undefined mientras se resuelve el enlace
   const userId = authUid && link?.uid === authUid ? (link.budget ?? authUid) : undefined
