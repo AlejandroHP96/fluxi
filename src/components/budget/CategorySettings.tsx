@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
@@ -18,7 +18,6 @@ interface CategorySettingsProps {
   onSaveFixedExpenses?: (list: FixedExpense[]) => Promise<boolean>
   onReassign: (ids: string[], categoryId: string) => Promise<boolean>
   onResetAll?: () => Promise<boolean>
-  deviceSection?: ReactNode // ajustes de este dispositivo (bloqueo con huella / Face ID)
   onClose: () => void
 }
 
@@ -39,7 +38,6 @@ export const CategorySettings = ({
   onSaveFixedExpenses,
   onReassign,
   onResetAll,
-  deviceSection,
   onClose,
 }: CategorySettingsProps) => {
   const [tab, setTab] = useState<"categories" | "fixed">(initialTab)
@@ -302,8 +300,6 @@ export const CategorySettings = ({
               {busy ? "Guardando…" : "Guardar cambios"}
             </button>
           </div>
-
-          {deviceSection}
 
           {onResetAll && !resetting && (
             <button
