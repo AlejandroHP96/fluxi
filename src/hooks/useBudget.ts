@@ -6,7 +6,7 @@ import type { Transaction } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
-import type { BudgetCategory, Expense, FixedExpense, NewExpense, Refund, Wallet } from "../types/budget"
+import type { BudgetCategory, Expense, FixedExpense, Members, NewExpense, Refund, Wallet } from "../types/budget"
 import { syncRefundMoves } from "../utils/wallet"
 import type { CategoryMemory } from "../utils/importQueue"
 import type { BankSession } from "../utils/bankClient"
@@ -18,9 +18,24 @@ const cleanCategory = (c: BudgetCategory): BudgetCategory => {
   return typeof c.amount === "number" ? { ...base, pct: 0, amount: Math.max(0, Math.round(c.amount * 100) / 100) } : base
 }
 
-// Gastos (colección "expenses") y ajustes del usuario en budgets/{uid}: categorías con %, nómina de cada
-// mes y la memoria de categorías elegidas al importar
-const useFirestoreBudget = (userId: string | undefined) => {
+// Gastos (colección "expenses") y ajustes del presupuesto en budgets/{uid}: categorías con %, nómina de cada
+// mes y la memoria de categorías elegidas al importar. authUid es quien ha iniciado sesión; el presupuesto
+// es el suyo o, si su cuenta está enlazada a otra (links/{uid}), el de esa otra cuenta
+const useFirestoreBudget = (authUid: string | undefined) => {
+  // Si no se puede leer el enlace (p. ej. reglas aún sin desplegar), se usa el presupuesto propio
+  const [link, setLink] = useState<{ uid: string; budget: string | null } | null>(null)
+  useEffect(() => {
+    setLink(null)
+    if (!authUid) return
+    return onSnapshot(
+      doc(db, "links", authUid),
+      (s) => setLink({ uid: authUid, budget: (s.data()?.budget as string | undefined) ?? null }),
+      () => setLink({ uid: authUid, budget: null })
+    )
+  }, [authUid])
+  // uid del presupuesto (el dueño); undefined mientras se resuelve el enlace
+  const userId = authUid && link?.uid === authUid ? (link.budget ?? authUid) : undefined
+
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [categories, setCategories] = useState<BudgetCategory[]>([])
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
@@ -28,6 +43,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
   const [memory, setMemory] = useState<CategoryMemory>({})
   const [bank, setBank] = useState<BankSession | null>(null)
   const [wallet, setWallet] = useState<Wallet | null>(null)
+  const [members, setMembers] = useState<Members>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,6 +56,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
     setMemory({})
     setBank(null)
     setWallet(null)
+    setMembers({})
     setError(null)
     setLoading(true)
     if (!userId) return
@@ -66,6 +83,8 @@ const useFirestoreBudget = (userId: string | undefined) => {
             category: data.category,
             date: data.date,
             ...(Array.isArray(data.refunds) && data.refunds.length ? { refunds: data.refunds as Refund[] } : {}),
+            ...(typeof data.createdBy === "string" ? { createdBy: data.createdBy } : {}),
+            ...(typeof data.updatedBy === "string" ? { updatedBy: data.updatedBy } : {}),
             _created: data.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER, // recién creado (pendiente) = el más nuevo
           }
         })
@@ -84,6 +103,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
       setMemory((data?.memory as CategoryMemory | undefined) ?? {})
       setBank((data?.bank as BankSession | undefined) ?? null)
       setWallet((data?.wallet as Wallet | undefined) ?? null)
+      setMembers((data?.members as Members | undefined) ?? {})
       markLoaded("settings")
     }, onErr("settings"))
 
@@ -108,7 +128,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
   // Devuelve el id del gasto creado (o null si falla), para poder deshacerlo
   const addExpense = async (e: NewExpense): Promise<string | null> => {
     try {
-      const ref = await addDoc(collection(db, "expenses"), { ...e, amount: Math.abs(Number(e.amount)), userId, createdAt: serverTimestamp() })
+      const ref = await addDoc(collection(db, "expenses"), { ...e, amount: Math.abs(Number(e.amount)), userId, createdBy: authUid, updatedBy: authUid, createdAt: serverTimestamp() })
       return ref.id
     } catch (err) {
       setError((err as Error).message)
@@ -117,7 +137,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
   }
 
   const updateExpense = (id: string, e: NewExpense) =>
-    run(() => updateDoc(doc(db, "expenses", id), { ...e, amount: Math.abs(Number(e.amount)) }))
+    run(() => updateDoc(doc(db, "expenses", id), { ...e, amount: Math.abs(Number(e.amount)), updatedBy: authUid }))
 
   // Gasto y cartera en una transacción: se leen del servidor en ese momento, así la cartera no se calcula
   // con un estado desfasado (ni se pisa el saldo si los ajustes aún no habían cargado)
@@ -146,7 +166,7 @@ const useFirestoreBudget = (userId: string | undefined) => {
   // Devoluciones de un gasto (lista completa). Las que van a la cartera se reflejan en ella en la misma transacción
   const saveRefunds = (e: Expense, refunds: Refund[]) =>
     withWallet(e.id, (tx, fresh, w) => {
-      tx.update(doc(db, "expenses", e.id), { refunds })
+      tx.update(doc(db, "expenses", e.id), { refunds, updatedBy: authUid })
       const old = fresh.refunds ?? []
       return [...old, ...refunds].some((r) => r.toWallet) ? syncRefundMoves(w, old, refunds, fresh.concept) : null
     })
@@ -206,6 +226,8 @@ const useFirestoreBudget = (userId: string | undefined) => {
 
   return {
     expenses, categories, fixedExpenses, income, memory, bank, wallet, loading, error,
+    // Presupuesto compartido: miembros (uid -> nombre), quién ha iniciado sesión y si es el dueño
+    members, currentUid: authUid ?? null, isOwner: !!userId && userId === authUid,
     addExpense, updateExpense, deleteExpense, reassignExpenses, saveRefunds, saveWallet,
     setIncome, saveCategories, saveFixedExpenses, remember, saveBank, resetAll,
   }
@@ -306,6 +328,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
 
   return {
     expenses, categories, fixedExpenses, income, memory, wallet, loading: false, error: null,
+    members: {}, currentUid: DEMO_UID, isOwner: true,
     addExpense: async (e: NewExpense) => {
       const id = newCategoryId()
       setExpenses((l) => sortList([{ ...e, amount: Math.abs(Number(e.amount)), id, userId: DEMO_UID }, ...l]))
