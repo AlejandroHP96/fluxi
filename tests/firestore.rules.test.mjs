@@ -3,7 +3,7 @@
 //        --project demo-fluxi "node tests/firestore.rules.test.mjs"
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing"
 import { readFileSync } from "fs"
-import { doc, setDoc, addDoc, updateDoc, collection, deleteField, serverTimestamp, deleteDoc, getDoc } from "firebase/firestore"
+import { doc, setDoc, addDoc, updateDoc, collection, deleteField, serverTimestamp, deleteDoc, getDoc, getDocs, query, where } from "firebase/firestore"
 
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8")
 const env = await initializeTestEnvironment({ projectId: "demo-fluxi", firestore: { rules, host: "127.0.0.1", port: 8089 } })
@@ -81,6 +81,39 @@ await t("demo no borra", assertFails(deleteDoc(doc(demo, "expenses/demo1"))))
 await t("demo lee lo suyo", assertSucceeds(getDoc(doc(demo, "expenses/demo1"))))
 await t("demo no toca budget", assertFails(setDoc(doc(demo, "budgets/" + demoUid), { userId: demoUid, income: { "2026-11": 1 } }, { merge: true })))
 await t("demo no borra budget", assertFails(deleteDoc(doc(demo, "budgets/" + demoUid))))
+
+// --- Presupuesto compartido: u1 dueño, m1 miembro, x1 desconocido ---
+const m = env.authenticatedContext("m1").firestore(), x = env.authenticatedContext("x1").firestore()
+await env.withSecurityRulesDisabled(async c => {
+  const f = c.firestore()
+  await setDoc(doc(f, "budgets/u1"), { userId: "u1", categories: [], members: { u1: "Alejandro", m1: "Ana" } }, { merge: true })
+  await setDoc(doc(f, "links/m1"), { budget: "u1" })
+  await setDoc(doc(f, "expenses/shared1"), { userId: "u1", amount: 5, concept: "Pan", category: "c1", date: "2026-11-21" })
+})
+const mine = { ...ok, createdBy: "m1", updatedBy: "m1" }
+await t("miembro consulta gastos del dueño", assertSucceeds(getDocs(query(collection(m, "expenses"), where("userId", "==", "u1")))))
+await t("desconocido no consulta", assertFails(getDocs(query(collection(x, "expenses"), where("userId", "==", "u1")))))
+await t("miembro crea gasto firmado", assertSucceeds(addDoc(collection(m, "expenses"), mine)))
+await t("miembro no firma como el dueño", assertFails(addDoc(collection(m, "expenses"), { ...mine, createdBy: "u1" })))
+await t("miembro no pone updatedBy ajeno", assertFails(addDoc(collection(m, "expenses"), { ...mine, updatedBy: "u1" })))
+await t("dueño crea firmado", assertSucceeds(addDoc(collection(u, "expenses"), { ...ok, createdBy: "u1", updatedBy: "u1" })))
+await t("gasto sin firma (app antigua)", assertSucceeds(addDoc(collection(u, "expenses"), ok)))
+await t("desconocido no crea en el budget", assertFails(addDoc(collection(x, "expenses"), { ...ok, createdBy: "x1" })))
+await t("miembro edita con su updatedBy", assertSucceeds(updateDoc(doc(m, "expenses/shared1"), { amount: 6, updatedBy: "m1" })))
+await t("miembro edita con updatedBy ajeno", assertFails(updateDoc(doc(m, "expenses/shared1"), { amount: 7, updatedBy: "u1" })))
+await t("nadie cambia createdBy", assertFails(updateDoc(doc(m, "expenses/shared1"), { createdBy: "m1" })))
+await t("desconocido no edita", assertFails(updateDoc(doc(x, "expenses/shared1"), { amount: 1 })))
+await t("miembro lee el budget", assertSucceeds(getDoc(doc(m, "budgets/u1"))))
+await t("miembro cambia la nómina", assertSucceeds(setDoc(doc(m, "budgets/u1"), { userId: "u1", income: { "2026-11": 2000 } }, { merge: true })))
+await t("miembro no toca members", assertFails(setDoc(doc(m, "budgets/u1"), { userId: "u1", members: { m1: "Ana", x1: "X" } }, { merge: true })))
+await t("dueño no toca members desde la app", assertFails(setDoc(doc(u, "budgets/u1"), { userId: "u1", members: { u1: "A" } }, { merge: true })))
+await t("miembro no borra el budget", assertFails(deleteDoc(doc(m, "budgets/u1"))))
+await t("desconocido no lee el budget", assertFails(getDoc(doc(x, "budgets/u1"))))
+await t("miembro lee su link", assertSucceeds(getDoc(doc(m, "links/m1"))))
+await t("dueño lee su link (no existe)", assertSucceeds(getDoc(doc(u, "links/u1"))))
+await t("miembro no escribe su link", assertFails(setDoc(doc(m, "links/m1"), { budget: "x1" })))
+await t("desconocido no lee links ajenos", assertFails(getDoc(doc(x, "links/m1"))))
+await t("miembro borra gasto", assertSucceeds(deleteDoc(doc(m, "expenses/shared1"))))
 
 await env.cleanup()
 console.log(failures ? `\n${failures} caso(s) fallidos` : "\nTodos los casos en verde")

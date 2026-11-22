@@ -1,9 +1,21 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cada documento es solo de su dueño y el dueño no se puede cambiar
+    // Dueño del presupuesto o miembro (budgets/{uid}.members, que solo escribe el script de enlace)
+    function canUse(budgetUid) {
+      return request.auth != null && (request.auth.uid == budgetUid
+        || (exists(/databases/$(database)/documents/budgets/$(budgetUid))
+            && request.auth.uid in get(/databases/$(database)/documents/budgets/$(budgetUid)).data.get('members', {})));
+    }
+
+    // Cada gasto es del presupuesto de su userId (dueño o miembros) y no se puede cambiar de presupuesto
     function owns(data) {
-      return request.auth != null && data.userId == request.auth.uid;
+      return canUse(data.userId);
+    }
+
+    // Autoría del gasto: opcional (una app antigua en caché no la manda), pero si viene es quien escribe
+    function signedBy(d, field) {
+      return !(field in d) || d[field] == request.auth.uid;
     }
 
     // Cuenta demo pública (botón «Entrar como Tester»): funciona en memoria y nunca escribe en Firestore.
@@ -36,18 +48,22 @@ service cloud.firestore {
       allow read: if owns(resource.data);
       allow delete: if owns(resource.data) && notDemo();
       allow create: if owns(request.resource.data) && notDemo()
-        && request.resource.data.keys().hasOnly(['userId', 'amount', 'concept', 'category', 'date', 'createdAt'])
-        && validExpense(request.resource.data);
+        && request.resource.data.keys().hasOnly(['userId', 'amount', 'concept', 'category', 'date', 'createdAt', 'createdBy', 'updatedBy'])
+        && validExpense(request.resource.data)
+        && signedBy(request.resource.data, 'createdBy') && signedBy(request.resource.data, 'updatedBy');
       // Solo se pueden cambiar estos campos (los gastos antiguos pueden traer otros y se respetan)
-      allow update: if owns(resource.data) && owns(request.resource.data) && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date', 'refunds'])
-        && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys());
+      // createdBy no se puede cambiar; updatedBy, si cambia, es quien escribe
+      allow update: if owns(resource.data) && request.resource.data.userId == resource.data.userId && notDemo()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date', 'refunds', 'updatedBy'])
+        && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys())
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid);
     }
 
     // Reparto (categories), nóminas por mes (income), gastos fijos, categorías recordadas al importar (memory)
     // , la sesión del banco de Enable Banking (bank) y la cartera de ahorros (wallet: saldo inicial y movimientos)
-    function validBudget(d) {
-      return d.userId == request.auth.uid
+    // userId es el dueño del presupuesto (el uid del documento), también cuando escribe un miembro
+    function validBudget(d, uid) {
+      return d.userId == uid
         && (!('categories' in d) || (d.categories is list && d.categories.size() <= 50))
         && (!('fixedExpenses' in d) || (d.fixedExpenses is list && d.fixedExpenses.size() <= 50))
         && (!('income' in d) || (d.income is map && d.income.size() <= 600))
@@ -58,15 +74,21 @@ service cloud.firestore {
               && (!('movements' in d.wallet) || (d.wallet.movements is list && d.wallet.movements.size() <= 2000))));
     }
 
+    // Crear y borrar el presupuesto, solo el dueño. members no está entre las claves que la app puede escribir
     match /budgets/{uid} {
-      allow read: if request.auth != null && request.auth.uid == uid;
+      allow read: if canUse(uid);
       allow create: if request.auth != null && request.auth.uid == uid && notDemo()
         && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank', 'wallet'])
-        && validBudget(request.resource.data);
-      allow update: if request.auth != null && request.auth.uid == uid && notDemo()
+        && validBudget(request.resource.data, uid);
+      allow update: if canUse(uid) && notDemo()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank', 'wallet'])
-        && validBudget(request.resource.data);
+        && validBudget(request.resource.data, uid);
       allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
+    }
+
+    // Enlace de un miembro con el presupuesto que usa ({ budget: uid del dueño }). Solo lo escribe el script
+    match /links/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
     }
 
     // El resto (colecciones de la versión anterior: transactions, transfers, accounts, goals, finance)
