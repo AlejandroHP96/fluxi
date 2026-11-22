@@ -71,13 +71,20 @@ const AuthPage = ({ onSignIn, onResetPassword }: AuthPageProps) => {
           <ZkLogo id="navbar-brand-logo" className="w-10 h-10" />
           <span className="font-bold text-2xl tracking-tight">Fluxi</span>
         </div>
-        <div className="glass-panel rounded-3xl p-7">
+        {/* <form> con autocomplete: el móvil guarda la contraseña y la rellena con huella / Face ID */}
+        <form
+          className="glass-panel rounded-3xl p-7"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void handle()
+          }}
+        >
           <h2 className="text-base font-semibold mb-6">
             {mode === "login" ? "Iniciar sesión" : "Recuperar contraseña"}
           </h2>
           <div className="mb-4">
             <label className="block text-xs text-white/60 mb-1">Email</label>
-            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            <input type="email" name="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)}
               placeholder="tu@email.com"
               className="glass-input rounded-xl w-full px-3 py-2 text-sm" />
           </div>
@@ -86,8 +93,8 @@ const AuthPage = ({ onSignIn, onResetPassword }: AuthPageProps) => {
           ) : (
             <div className="mb-6">
               <label className="block text-xs text-white/60 mb-1">Contraseña</label>
-              <input type="password" value={password} onChange={(e) => setPass(e.target.value)}
-                placeholder="••••••••" onKeyDown={(e) => e.key === "Enter" && handle()}
+              <input type="password" name="password" autoComplete="current-password" value={password} onChange={(e) => setPass(e.target.value)}
+                placeholder="••••••••"
                 className="glass-input rounded-xl w-full px-3 py-2 text-sm" />
               <button type="button" onClick={() => goTo("reset")} className="mt-2 text-xs text-cyan-300 hover:underline">
                 ¿Olvidaste la contraseña?
@@ -96,22 +103,22 @@ const AuthPage = ({ onSignIn, onResetPassword }: AuthPageProps) => {
           )}
           {err && <p className="text-red-400 text-xs mb-4">{err}</p>}
           {msg && <p className="text-emerald-400 text-xs mb-4">{msg}</p>}
-          <button onClick={handle} disabled={loading}
+          <button type="submit" disabled={loading}
             className={`liquid-button rounded-xl font-semibold text-[#04202a] w-full py-2.5 text-sm transition-opacity mb-4 ${loading ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
             {loading ? "Cargando..." : mode === "login" ? "Entrar" : "Enviar enlace"}
           </button>
           {mode === "login" && (
-            <button onClick={handleTester} disabled={loading}
+            <button type="button" onClick={handleTester} disabled={loading}
               className="rounded-xl border border-white/10 bg-white/[0.03] text-white/75 hover:border-cyan-400/40 hover:text-white w-full py-2.5 text-sm font-medium transition-colors mb-4 disabled:opacity-50">
               Entrar como Tester
             </button>
           )}
           {mode === "reset" && (
             <p className="text-center text-xs text-white/60">
-              <button onClick={() => goTo("login")} className="text-cyan-300 hover:underline">Volver a iniciar sesión</button>
+              <button type="button" onClick={() => goTo("login")} className="text-cyan-300 hover:underline">Volver a iniciar sesión</button>
             </p>
           )}
-        </div>
+        </form>
       </div>
     </div>
   )

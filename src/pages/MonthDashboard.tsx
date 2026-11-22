@@ -11,6 +11,7 @@ import { BentoKpis } from "../components/budget/BentoKpis"
 import { MonthCharts } from "../components/budget/MonthCharts"
 import { EnvelopesGrid } from "../components/budget/EnvelopesGrid"
 import { ExpenseList } from "../components/budget/ExpenseList"
+import { BiometricToggle } from "../components/security/BiometricToggle"
 
 const ExpenseModal = lazy(() =>
   import("../components/budget/ExpenseModal").then((m) => ({ default: m.ExpenseModal }))
@@ -186,6 +187,9 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
             onReassign={reassignExpenses}
             // «Borrar todos mis datos» solo para el dueño del presupuesto
             onResetAll={budget.isOwner ? budget.resetAll : undefined}
+            deviceSection={
+              budget.currentUid && email && email !== DEMO_EMAIL ? <BiometricToggle uid={budget.currentUid} email={email} /> : undefined
+            }
             onClose={closeSettings}
           />
         </Suspense>
