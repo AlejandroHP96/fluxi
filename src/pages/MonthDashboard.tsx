@@ -34,6 +34,11 @@ interface MonthDashboardProps {
 
 type ModalState = { kind: "new" } | { kind: "edit"; expense: Expense } | null
 
+// Espera a que el presupuesto esté cargado (máx. 15 s): antes no se sabe en cuál guardar
+const waitForBudget = async (ref: { current: BudgetApi }) => {
+  for (let i = 0; i < 150 && ref.current.loading; i++) await new Promise((r) => setTimeout(r, 100))
+}
+
 const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   const {
     expenses,
@@ -72,7 +77,10 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   const defaultDate = summary.isCurrent ? todayKey() : `${month}-01`
   const firstTime = !loading && categories.length === 0
 
-  // Vuelta del banco tras autorizar: cierra el círculo una sola vez (StrictMode monta dos veces)
+  // Vuelta del banco tras autorizar: cierra el círculo una sola vez (StrictMode monta dos veces).
+  // Se guarda con el budget más reciente: el del primer render aún no sabe qué presupuesto es
+  const budgetRef = useRef(budget)
+  budgetRef.current = budget
   const bankRedirectDone = useRef(false)
   useEffect(() => {
     if (bankRedirectDone.current) return
@@ -85,7 +93,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
     }
     void finishBankConnection(redirect.code)
       .then(async (session) => {
-        await budget.saveBank(session)
+        await waitForBudget(budgetRef)
+        await budgetRef.current.saveBank(session)
         setImporting(true)
       })
       .catch((e: unknown) => setBankError((e as Error).message))

@@ -29,7 +29,12 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     if (!authUid) return
     return onSnapshot(
       doc(db, "links", authUid),
-      (s) => setLink({ uid: authUid, budget: (s.data()?.budget as string | undefined) ?? null }),
+      { includeMetadataChanges: true },
+      (s) => {
+        // «No hay enlace» sacado de la caché puede estar desfasado (enlazada después): con red se espera al servidor
+        if (!s.exists() && s.metadata.fromCache && navigator.onLine) return
+        setLink({ uid: authUid, budget: (s.data()?.budget as string | undefined) ?? null })
+      },
       () => setLink({ uid: authUid, budget: null })
     )
   }, [authUid])
@@ -113,7 +118,9 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     }
   }, [userId])
 
+  // Sin presupuesto resuelto todavía no se escribe nada (se ignora en vez de fallar)
   const run = async (fn: () => Promise<unknown>): Promise<boolean> => {
+    if (!userId) return false
     try {
       await fn()
       return true
@@ -127,6 +134,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   // ── Gastos ──
   // Devuelve el id del gasto creado (o null si falla), para poder deshacerlo
   const addExpense = async (e: NewExpense): Promise<string | null> => {
+    if (!userId) return null
     try {
       const ref = await addDoc(collection(db, "expenses"), { ...e, amount: Math.abs(Number(e.amount)), userId, createdBy: authUid, updatedBy: authUid, createdAt: serverTimestamp() })
       return ref.id
@@ -179,7 +187,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     run(async () => {
       for (let i = 0; i < ids.length; i += 400) {
         const batch = writeBatch(db)
-        for (const id of ids.slice(i, i + 400)) batch.update(doc(db, "expenses", id), { category: categoryId })
+        for (const id of ids.slice(i, i + 400)) batch.update(doc(db, "expenses", id), { category: categoryId, updatedBy: authUid })
         await batch.commit()
       }
     })
@@ -221,7 +229,9 @@ const useFirestoreBudget = (authUid: string | undefined) => {
         for (const id of ids.slice(i, i + 400)) batch.delete(doc(db, "expenses", id))
         await batch.commit()
       }
-      await deleteDoc(settingsRef())
+      // Si el presupuesto es compartido se vacía conservando los miembros (members solo lo escribe el script)
+      if (Object.keys(members).length) await setDoc(settingsRef(), { userId, members })
+      else await deleteDoc(settingsRef())
     })
 
   return {

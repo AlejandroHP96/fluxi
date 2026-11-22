@@ -12,15 +12,25 @@ const PROJECT = "dashboard-finance-48b7f"
 const DEMO_UID = "jTQDmVrbmDSX657q7Of8E0O0EfK2" // src/constants/demo.ts
 const DOCS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`
 
-const args = process.argv.slice(2)
-const flag = (name) => {
-  const i = args.indexOf(name)
-  return i === -1 ? null : args[i + 1]
-}
-const apply = args.includes("--apply")
-// Posicionales: todo lo que no es una opción ni el valor de --owner / --owner-name
+// Argumentos estrictos: una opción desconocida, «--opción=valor» o un posicional de más aborta (nada de suposiciones)
 const VALUE_FLAGS = ["--owner", "--owner-name"]
-const [command, email, name] = args.filter((a, i) => !a.startsWith("--") && !VALUE_FLAGS.includes(args[i - 1]))
+const opts = {}
+const positional = []
+const argv = process.argv.slice(2)
+let badArgs = false
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i]
+  if (a === "--apply") opts.apply = true
+  else if (VALUE_FLAGS.includes(a)) {
+    const v = argv[++i]
+    if (!v || v.startsWith("--")) badArgs = true
+    else opts[a] = v
+  } else if (a.startsWith("--")) badArgs = true
+  else positional.push(a)
+}
+const flag = (name) => opts[name] ?? null
+const apply = !!opts.apply
+const [command, email, name] = positional
 
 const usage = () => {
   console.error("Uso: node scripts/members.cjs link <email> <nombre> [--owner-name Alejandro] [--owner <uid>] [--apply]")
@@ -29,7 +39,8 @@ const usage = () => {
 }
 
 async function main() {
-  if (!["link", "unlink"].includes(command) || !email || (command === "link" && !name)) usage()
+  const expected = command === "link" ? 3 : 2
+  if (badArgs || !["link", "unlink"].includes(command) || positional.length !== expected) usage()
 
   const auth = require(path.join(execSync("npm root -g").toString().trim(), "firebase-tools/lib/auth.js"))
   const account = auth.getGlobalDefaultAccount()
@@ -64,6 +75,10 @@ async function main() {
     Object.entries(budget.fields?.members?.mapValue?.fields ?? {}).map(([k, v]) => [k, v.stringValue])
   )
   const link = await call(`${DOCS}/links/${member}`)
+  const linkedTo = link?.fields?.budget?.stringValue ?? null
+  // Un miembro solo pertenece a un presupuesto: si ya está en otro, primero hay que desenlazarlo de ese
+  if (linkedTo && linkedTo !== owner) throw new Error(`Ese miembro está enlazado al presupuesto de ${linkedTo}: usa --owner ${linkedTo} con unlink primero`)
+  if (command === "link" && (await call(`${DOCS}/links/${owner}`))) throw new Error("El dueño es a su vez miembro de otro presupuesto")
 
   const next = { ...current }
   if (command === "link") {
@@ -81,7 +96,8 @@ async function main() {
   if (!apply) return console.log("\nSolo lectura. Nada escrito. Repite con --apply para aplicarlo.")
 
   const mapValue = { fields: Object.fromEntries(Object.entries(next).map(([k, v]) => [k, { stringValue: v }])) }
-  await call(`${DOCS}/budgets/${owner}?updateMask.fieldPaths=members&currentDocument.exists=true`, {
+  // updateTime: si el presupuesto ha cambiado desde que se leyó, falla en vez de pisar members
+  await call(`${DOCS}/budgets/${owner}?updateMask.fieldPaths=members&currentDocument.updateTime=${encodeURIComponent(budget.updateTime)}`, {
     method: "PATCH",
     body: JSON.stringify({ fields: { members: { mapValue } } }),
   })

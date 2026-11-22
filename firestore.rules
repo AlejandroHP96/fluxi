@@ -50,13 +50,16 @@ service cloud.firestore {
       allow create: if owns(request.resource.data) && notDemo()
         && request.resource.data.keys().hasOnly(['userId', 'amount', 'concept', 'category', 'date', 'createdAt', 'createdBy', 'updatedBy'])
         && validExpense(request.resource.data)
-        && signedBy(request.resource.data, 'createdBy') && signedBy(request.resource.data, 'updatedBy');
+        && signedBy(request.resource.data, 'createdBy') && signedBy(request.resource.data, 'updatedBy')
+        // Un miembro siempre firma (solo el dueño puede venir de una app antigua sin firma)
+        && (request.auth.uid == request.resource.data.userId || request.resource.data.get('createdBy', null) == request.auth.uid);
       // Solo se pueden cambiar estos campos (los gastos antiguos pueden traer otros y se respetan)
       // createdBy no se puede cambiar; updatedBy, si cambia, es quien escribe
       allow update: if owns(resource.data) && request.resource.data.userId == resource.data.userId && notDemo()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date', 'refunds', 'updatedBy'])
         && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys())
-        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid);
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid)
+        && (request.auth.uid == resource.data.userId || request.resource.data.get('updatedBy', null) == request.auth.uid);
     }
 
     // Reparto (categories), nóminas por mes (income), gastos fijos, categorías recordadas al importar (memory)
@@ -82,6 +85,8 @@ service cloud.firestore {
         && validBudget(request.resource.data, uid);
       allow update: if canUse(uid) && notDemo()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'memory', 'bank', 'wallet'])
+        // La conexión con el banco es solo del dueño (usa sus cuentas)
+        && (request.auth.uid == uid || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['bank']))
         && validBudget(request.resource.data, uid);
       allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
     }

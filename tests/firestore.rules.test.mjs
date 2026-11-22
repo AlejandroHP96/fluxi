@@ -3,7 +3,7 @@
 //        --project demo-fluxi "node tests/firestore.rules.test.mjs"
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing"
 import { readFileSync } from "fs"
-import { doc, setDoc, addDoc, updateDoc, collection, deleteField, serverTimestamp, deleteDoc, getDoc, getDocs, query, where } from "firebase/firestore"
+import { doc, setDoc, addDoc, updateDoc, collection, deleteField, serverTimestamp, deleteDoc, getDoc, getDocs, query, where, writeBatch } from "firebase/firestore"
 
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8")
 const env = await initializeTestEnvironment({ projectId: "demo-fluxi", firestore: { rules, host: "127.0.0.1", port: 8089 } })
@@ -113,7 +113,28 @@ await t("miembro lee su link", assertSucceeds(getDoc(doc(m, "links/m1"))))
 await t("dueño lee su link (no existe)", assertSucceeds(getDoc(doc(u, "links/u1"))))
 await t("miembro no escribe su link", assertFails(setDoc(doc(m, "links/m1"), { budget: "x1" })))
 await t("desconocido no lee links ajenos", assertFails(getDoc(doc(x, "links/m1"))))
+await t("miembro no crea sin firmar", assertFails(addDoc(collection(m, "expenses"), ok)))
+await env.withSecurityRulesDisabled(async c => {
+  await setDoc(doc(c.firestore(), "expenses/shared2"), { userId: "u1", amount: 5, concept: "Leche", category: "c1", date: "2026-11-21", createdBy: "u1", updatedBy: "u1" })
+})
+await t("miembro no edita sin firmar", assertFails(updateDoc(doc(m, "expenses/shared2"), { amount: 8 })))
+await t("dueño edita sin firmar (app antigua)", assertSucceeds(updateDoc(doc(u, "expenses/shared2"), { amount: 8 })))
+await t("dueño guarda el banco", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", bank }, { merge: true })))
+await t("miembro no toca el banco", assertFails(setDoc(doc(m, "budgets/u1"), { userId: "u1", bank: deleteField() }, { merge: true })))
+await t("miembro cambia otra cosa con banco puesto", assertSucceeds(setDoc(doc(m, "budgets/u1"), { userId: "u1", income: { "2026-12": 1 } }, { merge: true })))
+await t("dueño quita el banco", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", bank: deleteField() }, { merge: true })))
+await env.withSecurityRulesDisabled(async c => {
+  const f = c.firestore()
+  for (let i = 0; i < 25; i++) await setDoc(doc(f, `expenses/lote${i}`), { userId: "u1", amount: 1, concept: "x", category: "c1", date: "2026-11-21" })
+})
+await t("miembro reasigna 25 gastos en un lote", assertSucceeds((() => {
+  const batch = writeBatch(m)
+  for (let i = 0; i < 25; i++) batch.update(doc(m, `expenses/lote${i}`), { category: "c2", updatedBy: "m1" })
+  return batch.commit()
+})()))
 await t("miembro borra gasto", assertSucceeds(deleteDoc(doc(m, "expenses/shared1"))))
+await t("dueño vacía el budget conservando members", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", members: { u1: "Alejandro", m1: "Ana" } })))
+await t("miembro sigue entrando tras vaciar", assertSucceeds(getDoc(doc(m, "budgets/u1"))))
 
 await env.cleanup()
 console.log(failures ? `\n${failures} caso(s) fallidos` : "\nTodos los casos en verde")
