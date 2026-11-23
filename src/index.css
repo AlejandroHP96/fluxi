@@ -2,6 +2,18 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Tema de color (acento). Por defecto cian; applyTheme() de src/constants/themes.ts lo cambia */
+:root {
+  --acc-100: 207 250 254;
+  --acc-200: 165 243 252;
+  --acc-300: 103 232 249;
+  --acc-400: 34 211 238;
+  --acc-500: 6 182 212;
+  --acc-950: 4 32 42;
+  --alt-400: 56 189 248;
+  --alt-500: 14 165 233;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -12,9 +24,9 @@ body {
   background-color: #060913;
   /* Fondo orgánico con orbes líquidos y malla de luz */
   background-image: 
-    radial-gradient(ellipse 80% 60% at 15% -10%, rgba(6, 182, 212, 0.22), transparent 60%),
+    radial-gradient(ellipse 80% 60% at 15% -10%, rgb(var(--acc-500) / 0.22), transparent 60%),
     radial-gradient(ellipse 70% 50% at 85% 110%, rgba(99, 102, 241, 0.20), transparent 60%),
-    radial-gradient(ellipse 50% 40% at 50% 45%, rgba(14, 165, 233, 0.10), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 50% 45%, rgb(var(--alt-500) / 0.10), transparent 70%),
     radial-gradient(ellipse 60% 50% at 90% 20%, rgba(168, 85, 247, 0.12), transparent 60%);
   background-attachment: fixed;
   color: #ffffff;
@@ -34,7 +46,7 @@ body {
     135deg,
     rgba(255, 255, 255, 0.08) 0%,
     rgba(255, 255, 255, 0.02) 60%,
-    rgba(6, 182, 212, 0.03) 100%
+    rgb(var(--acc-500) / 0.03) 100%
   );
   backdrop-filter: blur(28px) saturate(190%);
   -webkit-backdrop-filter: blur(28px) saturate(190%);
@@ -50,10 +62,10 @@ body {
 }
 
 .glass-card:hover {
-  border-color: rgba(6, 182, 212, 0.4);
+  border-color: rgb(var(--acc-500) / 0.4);
   border-top-color: rgba(255, 255, 255, 0.45);
   box-shadow: 
-    0 20px 50px -10px rgba(6, 182, 212, 0.2),
+    0 20px 50px -10px rgb(var(--acc-500) / 0.2),
     0 4px 12px 0 rgba(0, 0, 0, 0.4),
     inset 0 1px 2px 0 rgba(255, 255, 255, 0.5);
   transform: translateY(-2px);
@@ -82,9 +94,9 @@ body {
 }
 
 .glass-input:focus {
-  border-color: rgba(6, 182, 212, 0.6);
+  border-color: rgb(var(--acc-500) / 0.6);
   box-shadow: 
-    0 0 0 3px rgba(6, 182, 212, 0.2),
+    0 0 0 3px rgb(var(--acc-500) / 0.2),
     inset 0 1px 2px rgba(0, 0, 0, 0.2);
   outline: none;
 }
@@ -93,12 +105,12 @@ body {
 .liquid-button {
   background: linear-gradient(
     135deg,
-    rgba(6, 182, 212, 0.9) 0%,
-    rgba(14, 165, 233, 0.85) 50%,
-    rgba(56, 189, 248, 0.95) 100%
+    rgb(var(--acc-500) / 0.9) 0%,
+    rgb(var(--alt-500) / 0.85) 50%,
+    rgb(var(--alt-400) / 0.95) 100%
   );
   box-shadow: 
-    0 8px 24px -4px rgba(6, 182, 212, 0.4),
+    0 8px 24px -4px rgb(var(--acc-500) / 0.4),
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.5),
     inset 0 -2px 4px 0 rgba(0, 0, 0, 0.2);
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -106,7 +118,7 @@ body {
 
 .liquid-button:hover {
   box-shadow: 
-    0 12px 32px -4px rgba(6, 182, 212, 0.6),
+    0 12px 32px -4px rgb(var(--acc-500) / 0.6),
     inset 0 1px 2px 0 rgba(255, 255, 255, 0.7);
   transform: translateY(-1px);
 }
@@ -126,7 +138,7 @@ body {
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(6, 182, 212, 0.4);
+  background: rgb(var(--acc-500) / 0.4);
 }
 
 /* Barra de scroll de las cajas con scroll interno (lista de gastos): fina, separada del borde y en cian */
@@ -139,17 +151,17 @@ body {
 }
 .nice-scroll::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
-  background: linear-gradient(180deg, rgba(34, 211, 238, 0.45), rgba(14, 165, 233, 0.3)) padding-box;
+  background: linear-gradient(180deg, rgb(var(--acc-400) / 0.45), rgb(var(--alt-500) / 0.3)) padding-box;
   border-radius: 9999px;
 }
 .nice-scroll::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(34, 211, 238, 0.75), rgba(14, 165, 233, 0.55)) padding-box;
+  background: linear-gradient(180deg, rgb(var(--acc-400) / 0.75), rgb(var(--alt-500) / 0.55)) padding-box;
 }
 /* Firefox no tiene ::-webkit-scrollbar: solo admite grosor y colores */
 @supports not selector(::-webkit-scrollbar) {
   .nice-scroll {
     scrollbar-width: thin;
-    scrollbar-color: rgba(34, 211, 238, 0.45) transparent;
+    scrollbar-color: rgb(var(--acc-400) / 0.45) transparent;
   }
 }
 
@@ -184,7 +196,7 @@ html.zk-loading #navbar-brand-logo {
   fill: currentColor;
   opacity: 0;
   transform-origin: 540px 540px;
-  stroke: #22d3ee;
+  stroke: rgb(var(--acc-400));
   stroke-width: 5;
   stroke-dasharray: 600;
   stroke-dashoffset: 600;

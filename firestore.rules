@@ -74,15 +74,25 @@ service cloud.firestore {
               && (!('movements' in d.wallet) || (d.wallet.movements is list && d.wallet.movements.size() <= 2000))));
     }
 
+    // Tema de color de cada persona (themes: uid -> id de tema). Cada uno solo cambia el suyo
+    function okThemes(next, prev) {
+      return next is map && next.size() <= 10
+        && next.diff(prev).affectedKeys().hasOnly([request.auth.uid])
+        && (!(request.auth.uid in next) || (next[request.auth.uid] is string && next[request.auth.uid].size() <= 20));
+    }
+
     // Crear y borrar el presupuesto, solo el dueño. members no está entre las claves que la app puede escribir
     match /budgets/{uid} {
       allow read: if canUse(uid);
       allow create: if request.auth != null && request.auth.uid == uid && notDemo()
-        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet'])
-        && validBudget(request.resource.data, uid);
+        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet', 'themes'])
+        && validBudget(request.resource.data, uid)
+        && (!('themes' in request.resource.data) || okThemes(request.resource.data.themes, {}));
       allow update: if canUse(uid) && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet'])
-        && validBudget(request.resource.data, uid);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet', 'themes'])
+        && validBudget(request.resource.data, uid)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['themes'])
+            || okThemes(request.resource.data.themes, resource.data.get('themes', {})));
       allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
     }
 

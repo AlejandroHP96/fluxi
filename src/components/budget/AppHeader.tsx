@@ -1,13 +1,14 @@
-import { LogOut, SlidersHorizontal } from "lucide-react"
+import { LogOut, Palette, SlidersHorizontal } from "lucide-react"
 import { ZkLogo } from "../brand/ZkLogo"
 
 interface AppHeaderProps {
   email: string | null
   onSignOut: () => void
   onCategories: () => void
+  onTheme: () => void
 }
 
-export const AppHeader = ({ email, onSignOut, onCategories }: AppHeaderProps) => (
+export const AppHeader = ({ email, onSignOut, onCategories, onTheme }: AppHeaderProps) => (
   <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#07090e]/80 backdrop-blur-xl">
     <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-3 sm:px-6">
       <div className="flex items-center gap-2.5">
@@ -23,6 +24,14 @@ export const AppHeader = ({ email, onSignOut, onCategories }: AppHeaderProps) =>
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
           <span>Reparto</span>
+        </button>
+        <button
+          onClick={onTheme}
+          aria-label="Tema de color"
+          title="Tema de color"
+          className="flex shrink-0 items-center rounded-lg border border-white/10 p-1.5 text-white/70 transition-colors hover:border-cyan-400/40 hover:text-white"
+        >
+          <Palette className="h-4 w-4" />
         </button>
         <button
           onClick={onSignOut}

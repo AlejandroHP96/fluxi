@@ -104,7 +104,7 @@ const AuthPage = ({ onSignIn, onResetPassword }: AuthPageProps) => {
           {err && <p className="text-red-400 text-xs mb-4">{err}</p>}
           {msg && <p className="text-emerald-400 text-xs mb-4">{msg}</p>}
           <button type="submit" disabled={loading}
-            className={`liquid-button rounded-xl font-semibold text-[#04202a] w-full py-2.5 text-sm transition-opacity mb-4 ${loading ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
+            className={`liquid-button rounded-xl font-semibold text-cyan-950 w-full py-2.5 text-sm transition-opacity mb-4 ${loading ? "opacity-50 cursor-not-allowed" : "hover:opacity-90"}`}>
             {loading ? "Cargando..." : mode === "login" ? "Entrar" : "Enviar enlace"}
           </button>
           {mode === "login" && (

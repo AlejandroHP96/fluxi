@@ -37,7 +37,7 @@ export const MonthNav = ({ month, isCurrent, onPrev, onNext, onToday, onAdd }: M
 
     <button
       onClick={onAdd}
-      className="liquid-button hidden items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[#04202a] sm:flex"
+      className="liquid-button hidden items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-cyan-950 sm:flex"
     >
       <Plus className="h-4 w-4" strokeWidth={2.5} />
       Apuntar gasto

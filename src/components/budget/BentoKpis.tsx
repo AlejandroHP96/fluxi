@@ -78,7 +78,7 @@ export const BentoKpis = ({
         style={{
           backgroundImage: isNegative
             ? "radial-gradient(ellipse 90% 80% at 90% 10%, rgba(248, 113, 113, 0.15), transparent 70%)"
-            : "radial-gradient(ellipse 90% 80% at 90% 10%, rgba(6, 182, 212, 0.14), transparent 70%)",
+            : "radial-gradient(ellipse 90% 80% at 90% 10%, rgb(var(--acc-500) / 0.14), transparent 70%)",
         }}
       >
         <div className="flex items-start justify-between gap-2">
@@ -205,7 +205,7 @@ export const BentoKpis = ({
                 <button
                   type="submit"
                   disabled={savingIncome}
-                  className="liquid-button flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-semibold text-[#04202a]"
+                  className="liquid-button flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-semibold text-cyan-950"
                 >
                   <Check className="h-3.5 w-3.5" />
                   {savingIncome ? "…" : hasIncome ? "Guardar" : "Apuntar"}

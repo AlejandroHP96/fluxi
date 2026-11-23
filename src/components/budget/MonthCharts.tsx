@@ -202,8 +202,8 @@ export const MonthCharts = ({
           >
             <defs>
               <linearGradient id="dailyAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
+                <stop offset="0%" style={{ stopColor: "rgb(var(--acc-400))" }} stopOpacity="0.35" />
+                <stop offset="100%" style={{ stopColor: "rgb(var(--acc-400))" }} stopOpacity="0.0" />
               </linearGradient>
             </defs>
 
@@ -237,7 +237,7 @@ export const MonthCharts = ({
             <path
               d={linePath}
               fill="none"
-              stroke="#22d3ee"
+              style={{ stroke: "rgb(var(--acc-400))" }}
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -256,7 +256,7 @@ export const MonthCharts = ({
                       cx={cx}
                       cy={cy}
                       r={isHovered ? 5 : 3}
-                      fill="#22d3ee"
+                      style={{ fill: "rgb(var(--acc-400))" }}
                       stroke="#07090e"
                       strokeWidth="2"
                     />
@@ -389,8 +389,7 @@ export const MonthCharts = ({
                       width={colWidth - 8}
                       height={chartH}
                       rx="8"
-                      fill="rgba(6, 182, 212, 0.08)"
-                      stroke="rgba(6, 182, 212, 0.3)"
+                      style={{ fill: "rgb(var(--acc-500) / 0.08)", stroke: "rgb(var(--acc-500) / 0.3)" }}
                       strokeWidth="1"
                     />
                   )}
@@ -433,7 +432,7 @@ export const MonthCharts = ({
                     x={centerX}
                     y={height - 2}
                     textAnchor="middle"
-                    fill={isSelected ? "#22d3ee" : "rgba(255,255,255,0.6)"}
+                    style={{ fill: isSelected ? "rgb(var(--acc-400))" : "rgba(255,255,255,0.6)" }}
                     fontSize="11"
                     fontWeight={isSelected ? "600" : "400"}
                   >

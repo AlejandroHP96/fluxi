@@ -295,7 +295,7 @@ export const CategorySettings = ({
               type="button"
               onClick={() => void save()}
               disabled={busy}
-              className="liquid-button ml-auto flex-1 rounded-xl px-5 py-3.5 text-base font-semibold text-[#04202a] disabled:opacity-60 sm:flex-none sm:min-w-[10rem]"
+              className="liquid-button ml-auto flex-1 rounded-xl px-5 py-3.5 text-base font-semibold text-cyan-950 disabled:opacity-60 sm:flex-none sm:min-w-[10rem]"
             >
               {busy ? "Guardando…" : "Guardar cambios"}
             </button>

@@ -76,7 +76,7 @@ export const FirstSetup = ({ month, onSubmit }: FirstSetupProps) => {
       <button
         type="submit"
         disabled={busy}
-        className="liquid-button w-full rounded-xl px-5 py-4 text-base font-semibold text-[#04202a] disabled:opacity-60"
+        className="liquid-button w-full rounded-xl px-5 py-4 text-base font-semibold text-cyan-950 disabled:opacity-60"
       >
         {busy ? "Guardando…" : "Empezar"}
       </button>

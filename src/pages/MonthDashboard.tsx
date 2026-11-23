@@ -1,10 +1,11 @@
-import { Suspense, lazy, useMemo, useState } from "react"
+import { Suspense, lazy, useEffect, useMemo, useState } from "react"
 import { AlertTriangle, Plus } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
 import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
 import type { Expense } from "../types/budget"
 import { DEMO_EMAIL } from "../constants/demo"
 import { authorshipLabel } from "../utils/members"
+import { applyTheme, rememberTheme, rememberedTheme } from "../constants/themes"
 import { AppHeader } from "../components/budget/AppHeader"
 import { MonthNav } from "../components/budget/MonthNav"
 import { BentoKpis } from "../components/budget/BentoKpis"
@@ -17,6 +18,9 @@ const ExpenseModal = lazy(() =>
 )
 const CategorySettings = lazy(() =>
   import("../components/budget/CategorySettings").then((m) => ({ default: m.CategorySettings }))
+)
+const ThemeModal = lazy(() =>
+  import("../components/budget/ThemeModal").then((m) => ({ default: m.ThemeModal }))
 )
 const FirstSetup = lazy(() =>
   import("../components/budget/FirstSetup").then((m) => ({ default: m.FirstSetup }))
@@ -49,6 +53,18 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   const [month, setMonth] = useState(currentMonthKey)
   const [modal, setModal] = useState<ModalState>(null)
   const [settingsTab, setSettingsTab] = useState<"categories" | "fixed" | null>(null)
+  const [themeOpen, setThemeOpen] = useState(false)
+
+  // Tema de quien ha iniciado sesión. Mientras cargan los datos, el último que usó en este dispositivo
+  const uid = budget.currentUid
+  const myTheme = uid ? (budget.themes[uid] ?? null) : null
+  useEffect(() => {
+    if (!uid) return
+    applyTheme(myTheme ?? (loading ? rememberedTheme(uid) : null))
+    if (myTheme) rememberTheme(uid, myTheme)
+  }, [uid, myTheme, loading])
+  // Al salir (login) vuelve el tema por defecto
+  useEffect(() => () => applyTheme(null), [])
 
   const monthExpenses = useMemo(() => expenses.filter((e) => e.date.startsWith(month)), [expenses, month])
   const summary = useMemo(
@@ -72,7 +88,14 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       email={email}
       onSignOut={onSignOut}
       onCategories={() => openSettings("categories")}
+      onTheme={() => setThemeOpen(true)}
     />
+  )
+
+  const themeModal = themeOpen && (
+    <Suspense fallback={null}>
+      <ThemeModal current={myTheme} onSave={budget.saveTheme} onClose={() => setThemeOpen(false)} />
+    </Suspense>
   )
 
   const errorBanner = error && (
@@ -96,6 +119,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
             />
           </Suspense>
         </main>
+        {themeModal}
       </div>
     )
   }
@@ -159,6 +183,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
               onSelect={(e) => setModal({ kind: "edit", expense: e })}
               onAdd={openNew}
               members={budget.members}
+              themes={budget.themes}
             />
           </div>
         </div>
@@ -168,12 +193,14 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#07090e] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:hidden">
         <button
           onClick={openNew}
-          className="liquid-button flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-semibold text-[#04202a]"
+          className="liquid-button flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-semibold text-cyan-950"
         >
           <Plus className="h-5 w-5" strokeWidth={2.5} />
           Apuntar gasto
         </button>
       </div>
+
+      {themeModal}
 
       {settingsTab && (
         <Suspense fallback={null}>

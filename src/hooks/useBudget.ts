@@ -6,7 +6,7 @@ import type { Transaction } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
-import type { BudgetCategory, Expense, FixedExpense, Members, NewExpense, Refund, Wallet } from "../types/budget"
+import type { BudgetCategory, Expense, FixedExpense, Members, NewExpense, Refund, Themes, Wallet } from "../types/budget"
 import { syncRefundMoves } from "../utils/wallet"
 
 // Categoría lista para guardar: los sobres en € llevan amount (y pct 0); los de % no llevan la clave
@@ -60,6 +60,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   const [income, setIncomeMap] = useState<Record<string, number>>({})
   const [wallet, setWallet] = useState<Wallet | null>(null)
   const [members, setMembers] = useState<Members>({})
+  const [themes, setThemes] = useState<Themes>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -71,6 +72,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     setIncomeMap({})
     setWallet(null)
     setMembers({})
+    setThemes({})
     setError(null)
     setLoading(true)
     if (!userId) return
@@ -116,6 +118,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
       setIncomeMap((data?.income as Record<string, number> | undefined) ?? {})
       setWallet((data?.wallet as Wallet | undefined) ?? null)
       setMembers((data?.members as Members | undefined) ?? {})
+      setThemes((data?.themes as Themes | undefined) ?? {})
       markLoaded("settings")
     }, onErr("settings"))
 
@@ -218,6 +221,10 @@ const useFirestoreBudget = (authUid: string | undefined) => {
       fixedExpenses: list.map((f) => ({ id: f.id || newCategoryId(), name: f.name.trim(), amount: Math.abs(Number(f.amount)) || 0 })),
     }, { merge: true }))
 
+  // Tema de color de quien ha iniciado sesión (solo el suyo: las reglas no dejan tocar el de otro)
+  const saveTheme = (id: string) =>
+    run(() => setDoc(settingsRef(), { userId, themes: { [authUid!]: id } }, { merge: true }))
+
   // Empezar de cero: borra todos los gastos y vacía los ajustes (categorías, nóminas, fijos y cartera).
   // Los gastos se piden al servidor (también los que otro miembro acaba de apuntar) y los ajustes se vacían en
   // el primer lote: si eso falla, no se ha borrado nada. members no se toca (solo lo escribe el script)
@@ -244,6 +251,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     budgetConfirmed: !!authUid && link?.uid === authUid && link.confirmed,
     // Presupuesto compartido: miembros (uid -> nombre), quién ha iniciado sesión y si es el dueño
     members, currentUid: authUid ?? null, isOwner: !!userId && userId === authUid,
+    themes, saveTheme,
     addExpense, updateExpense, deleteExpense, reassignExpenses, saveRefunds, saveWallet,
     setIncome, saveCategories, saveFixedExpenses, resetAll,
   }
@@ -322,6 +330,7 @@ const useDemoBudget = (active: boolean): BudgetApi => {
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([])
   const [income, setIncomeMap] = useState<Record<string, number>>(initial.income)
   const [wallet, setWallet] = useState<Wallet | null>(null)
+  const [themes, setThemes] = useState<Themes>({})
 
   // Al entrar de nuevo en la demo se parte de los datos de ejemplo (durante el render, sin un fotograma con lo anterior)
   const [wasActive, setWasActive] = useState(active)
@@ -343,6 +352,11 @@ const useDemoBudget = (active: boolean): BudgetApi => {
   return {
     expenses, categories, fixedExpenses, income, wallet, loading: false, error: null,
     members: {}, currentUid: DEMO_UID, isOwner: true, budgetConfirmed: true,
+    themes,
+    saveTheme: (id: string) => {
+      setThemes({ [DEMO_UID]: id })
+      return ok()
+    },
     addExpense: async (e: NewExpense) => {
       const id = newCategoryId()
       setExpenses((l) => sortList([{ ...e, amount: Math.abs(Number(e.amount)), id, userId: DEMO_UID }, ...l]))

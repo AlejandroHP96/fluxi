@@ -112,3 +112,7 @@ export interface MonthSummary {
 
 // Miembros del presupuesto compartido (budgets/{uid}.members): uid -> nombre. Lo escribe solo el script de enlace
 export type Members = Record<string, string>
+
+// Tema de color de cada persona del presupuesto (budgets/{uid}.themes): uid -> id de tema (src/constants/themes.ts).
+// Cada uno solo cambia el suyo; el resto lo lee para colorear su burbuja en la lista de gastos
+export type Themes = Record<string, string>

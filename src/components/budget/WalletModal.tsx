@@ -142,7 +142,7 @@ export const WalletModal = ({ wallet, onSave, onClose }: { wallet: Wallet; onSav
             type="button"
             onClick={() => void addMove()}
             disabled={busy}
-            className="liquid-button w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-[#04202a] disabled:opacity-60"
+            className="liquid-button w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-cyan-950 disabled:opacity-60"
           >
             {form.sign === 1 ? "Añadir a la cartera" : "Sacar de la cartera"}
           </button>

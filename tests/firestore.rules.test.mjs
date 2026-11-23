@@ -141,6 +141,17 @@ await t("vaciar conserva members", (async () => {
 await t("vaciar sin documento previo también vale", assertSucceeds(setDoc(doc(o, "budgets/u2"), { userId: "u2", categories: deleteField(), wallet: deleteField() }, { merge: true })))
 await t("miembro sigue entrando tras vaciar", assertSucceeds(getDoc(doc(m, "budgets/u1"))))
 
+// --- Temas de color (themes: uid -> tema), cada uno solo el suyo ---
+await t("miembro pone su tema", assertSucceeds(setDoc(doc(m, "budgets/u1"), { userId: "u1", themes: { m1: "violeta" } }, { merge: true })))
+await t("dueño pone su tema", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", themes: { u1: "azul" } }, { merge: true })))
+await t("miembro no cambia el tema del dueño", assertFails(setDoc(doc(m, "budgets/u1"), { userId: "u1", themes: { u1: "rosa" } }, { merge: true })))
+await t("miembro no borra el tema del dueño", assertFails(updateDoc(doc(m, "budgets/u1"), { "themes.u1": deleteField() })))
+await t("tema demasiado largo no", assertFails(setDoc(doc(m, "budgets/u1"), { userId: "u1", themes: { m1: "x".repeat(40) } }, { merge: true })))
+await t("tema no texto no", assertFails(setDoc(doc(m, "budgets/u1"), { userId: "u1", themes: { m1: 5 } }, { merge: true })))
+await t("desconocido no pone tema", assertFails(setDoc(doc(o, "budgets/u1"), { userId: "u1", themes: { u2: "azul" } }, { merge: true })))
+await t("crear budget con tema propio", assertSucceeds(setDoc(doc(env.authenticatedContext("u5").firestore(), "budgets/u5"), { userId: "u5", themes: { u5: "rosa" } })))
+await t("crear budget con tema ajeno no", assertFails(setDoc(doc(env.authenticatedContext("u4").firestore(), "budgets/u4"), { userId: "u4", themes: { zz: "rosa" } })))
+
 await env.cleanup()
 console.log(failures ? `\n${failures} caso(s) fallidos` : "\nTodos los casos en verde")
 process.exit(failures ? 1 : 0)

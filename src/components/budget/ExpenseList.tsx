@@ -2,7 +2,8 @@ import { useMemo, useState } from "react"
 import { Plus, Search, Undo2, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { resolveCategory, todayKey } from "../../utils/month"
-import { netAmount, type BudgetCategory, type Expense, type Members } from "../../types/budget"
+import { netAmount, type BudgetCategory, type Expense, type Members, type Themes } from "../../types/budget"
+import { themeById } from "../../constants/themes"
 import { authorName, isShared, memberInitials } from "../../utils/members"
 import { catColor, dayLabel } from "./helpers"
 
@@ -13,9 +14,16 @@ interface ExpenseListProps {
   onSelect: (e: Expense) => void
   onAdd: () => void
   members: Members // presupuesto compartido: con más de un miembro se enseña quién apuntó cada gasto
+  themes: Themes // tema de cada miembro: su inicial sale con ese color
 }
 
-export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, members }: ExpenseListProps) => {
+// Burbuja con el color del tema de quien apuntó el gasto
+const bubbleStyle = (themeId: string | undefined) => {
+  const t = themeById(themeId)
+  return { backgroundColor: `rgb(${t.acc[400]} / 0.22)`, color: `rgb(${t.acc[200]})` }
+}
+
+export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, members, themes }: ExpenseListProps) => {
   const shared = isShared(members)
   const initials = useMemo(() => memberInitials(members), [members])
   const [search, setSearch] = useState("")
@@ -67,7 +75,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
 
         <button
           onClick={onAdd}
-          className="liquid-button hidden items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-[#04202a] sm:flex"
+          className="liquid-button hidden items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold text-cyan-950 sm:flex"
         >
           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
           <span>Apuntar gasto</span>
@@ -132,7 +140,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
           <p className="mt-1 text-sm text-white/60">Apunta el primero y verás cómo avanza tu presupuesto.</p>
           <button
             onClick={onAdd}
-            className="liquid-button mx-auto mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-[#04202a]"
+            className="liquid-button mx-auto mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-cyan-950"
           >
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             Apuntar gasto
@@ -177,7 +185,8 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
                           <span
                             title={authorName(e, members) ?? undefined}
                             aria-label={`Apuntado por ${authorName(e, members) ?? "alguien que ya no está"}`}
-                            className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] px-1 text-[10px] font-semibold text-white/70"
+                            className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-semibold"
+                            style={bubbleStyle(themes[e.createdBy ?? e.userId])}
                           >
                             {initials[e.createdBy ?? e.userId] ?? "?"}
                           </span>
