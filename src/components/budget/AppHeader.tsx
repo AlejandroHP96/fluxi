@@ -1,14 +1,16 @@
 import { LogOut, Palette, SlidersHorizontal } from "lucide-react"
 import { ZkLogo } from "../brand/ZkLogo"
+import { PushButton } from "./PushButton"
 
 interface AppHeaderProps {
   email: string | null
   onSignOut: () => void
   onCategories: () => void
   onTheme: () => void
+  push?: { uid: string; budget: string } // avisos en el móvil (no en la demo)
 }
 
-export const AppHeader = ({ email, onSignOut, onCategories, onTheme }: AppHeaderProps) => (
+export const AppHeader = ({ email, onSignOut, onCategories, onTheme, push }: AppHeaderProps) => (
   <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink/80 backdrop-blur-xl">
     <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-3 sm:px-6">
       <div className="flex items-center gap-2.5">
@@ -25,6 +27,7 @@ export const AppHeader = ({ email, onSignOut, onCategories, onTheme }: AppHeader
           <SlidersHorizontal className="h-3.5 w-3.5" />
           <span>Reparto</span>
         </button>
+        {push && <PushButton uid={push.uid} budget={push.budget} />}
         <button
           onClick={onTheme}
           aria-label="Tema de color"

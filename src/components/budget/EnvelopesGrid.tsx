@@ -1,4 +1,6 @@
-import { AlertTriangle, CircleDashed, HelpCircle, SlidersHorizontal } from "lucide-react"
+import { useState } from "react"
+import { AlertTriangle, ArrowRight, CircleDashed, HelpCircle, SlidersHorizontal, Undo2 } from "lucide-react"
+import { shiftMonth } from "../../utils/month"
 import { fmt } from "../../utils/formatters"
 import type { BudgetCategory, EnvelopeStatus, EnvelopeSummary, MonthSummary } from "../../types/budget"
 import { catColor } from "./helpers"
@@ -7,6 +9,54 @@ interface EnvelopesGridProps {
   summary: MonthSummary
   categories: BudgetCategory[]
   onEdit: () => void
+  // Meses pasados: pasar lo que sobró de un sobre al mes siguiente (month = el que lo recibe); null lo deshace
+  onCarry?: (month: string, categoryId: string, amount: number | null) => Promise<boolean>
+}
+
+// «diciembre»
+const monthName = (month: string) => {
+  const [y, m] = month.split("-").map(Number)
+  return new Intl.DateTimeFormat("es-ES", { month: "long" }).format(new Date(y, m - 1, 1))
+}
+
+// Botón del sobre en un mes pasado: lo que sobró se suma al mismo sobre el mes siguiente (lo que no se pasa se pierde)
+const CarryButton = ({ e, month, onCarry }: { e: EnvelopeSummary; month: string; onCarry: NonNullable<EnvelopesGridProps["onCarry"]> }) => {
+  const [busy, setBusy] = useState(false)
+  const next = shiftMonth(month, 1)
+  const run = async (amount: number | null) => {
+    setBusy(true)
+    await onCarry(next, e.category.id, amount)
+    setBusy(false)
+  }
+  if (e.carriedOut > 0.005) {
+    return (
+      <p className="mt-2 flex items-center justify-between gap-1.5 text-[11px] text-cyan-200/85">
+        <span className="min-w-0 tabular-nums">{fmt(e.carriedOut)} a {monthName(next)}</span>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void run(null)}
+          aria-label={`Deshacer: no pasar ${fmt(e.carriedOut)} a ${monthName(next)}`}
+          title="Deshacer"
+          className="shrink-0 rounded-md p-1 text-white/55 hover:bg-white/[0.08] hover:text-white disabled:opacity-60"
+        >
+          <Undo2 className="h-3.5 w-3.5" />
+        </button>
+      </p>
+    )
+  }
+  if (e.remaining <= 0.005) return null
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => void run(e.remaining)}
+      className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-cyan-400/25 bg-cyan-400/[0.07] px-2 py-1.5 text-[11px] font-semibold text-cyan-100 transition-colors hover:border-cyan-300/50 disabled:opacity-60"
+    >
+      Pasar {fmt(e.remaining)} a {monthName(next)}
+      <ArrowRight className="h-3 w-3" />
+    </button>
+  )
 }
 
 const pct = (n: number) => `${Math.round(n * 10) / 10} %`.replace(".", ",")
@@ -33,10 +83,14 @@ const EnvelopeCard = ({
   e,
   categories,
   hasIncome,
+  month,
+  onCarry,
 }: {
   e: EnvelopeSummary
   categories: BudgetCategory[]
   hasIncome: boolean
+  month: string
+  onCarry?: EnvelopesGridProps["onCarry"]
 }) => {
   const st = STATUS[e.status]
   const over = e.remaining < -0.005
@@ -70,6 +124,9 @@ const EnvelopeCard = ({
               <p className="mt-0.5 text-xs text-white/55 tabular-nums">
                 {over ? "por encima de" : "quedan de"} {fmt(e.allocated)}
               </p>
+              {e.carriedIn > 0.005 && (
+                <p className="mt-0.5 text-[11px] tabular-nums text-cyan-200/80">+{fmt(e.carriedIn)} de {monthName(shiftMonth(month, -1))}</p>
+              )}
             </div>
           ) : (
             <div>
@@ -99,12 +156,13 @@ const EnvelopeCard = ({
         ) : (
           <div className="h-1.5 w-full rounded-full bg-white/[0.05]" />
         )}
+        {onCarry && !isSavings && hasIncome && <CarryButton e={e} month={month} onCarry={onCarry} />}
       </div>
     </div>
   )
 }
 
-export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridProps) => {
+export const EnvelopesGrid = ({ summary: s, categories, onEdit, onCarry }: EnvelopesGridProps) => {
   const hasIncome = s.income !== null
   const overHundred = s.totalPct > 100.005
 
@@ -161,12 +219,12 @@ export const EnvelopesGrid = ({ summary: s, categories, onEdit }: EnvelopesGridP
       <div className="grid grid-cols-2 gap-3 sm:gap-3.5 lg:grid-cols-3">
         {/* Sobres de gasto variable */}
         {s.envelopes.map((e) => (
-          <EnvelopeCard key={e.category.id} e={e} categories={categories} hasIncome={hasIncome} />
+          <EnvelopeCard key={e.category.id} e={e} categories={categories} hasIncome={hasIncome} month={s.month} onCarry={s.isPast ? onCarry : undefined} />
         ))}
 
         {/* Sobres de ahorro */}
         {s.savings.map((e) => (
-          <EnvelopeCard key={e.category.id} e={e} categories={categories} hasIncome={hasIncome} />
+          <EnvelopeCard key={e.category.id} e={e} categories={categories} hasIncome={hasIncome} month={s.month} />
         ))}
 
         {/* Tarjeta de gastos huérfanos sin categoría si los hay */}

@@ -40,7 +40,9 @@ service cloud.firestore {
         && (!changed.hasAny(['concept']) || okConcept(d))
         && (!changed.hasAny(['date']) || okDate(d))
         && (!changed.hasAny(['category']) || okCategory(d))
-        && (!changed.hasAny(['refunds']) || okRefunds(d));
+        && (!changed.hasAny(['refunds']) || okRefunds(d))
+        // Marca de foto del ticket: true o se quita
+        && (!changed.hasAny(['receipt']) || !('receipt' in d) || d.receipt == true);
     }
 
     // Gastos apuntados a mano
@@ -56,7 +58,7 @@ service cloud.firestore {
       // Solo se pueden cambiar estos campos (los gastos antiguos pueden traer otros y se respetan)
       // createdBy no se puede cambiar; updatedBy, si cambia, es quien escribe
       allow update: if owns(resource.data) && request.resource.data.userId == resource.data.userId && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date', 'refunds', 'updatedBy'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['amount', 'concept', 'category', 'date', 'refunds', 'updatedBy', 'receipt'])
         && validChanges(request.resource.data, request.resource.data.diff(resource.data).affectedKeys())
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedBy']) || request.resource.data.updatedBy == request.auth.uid)
         && (request.auth.uid == resource.data.userId || request.resource.data.get('updatedBy', null) == request.auth.uid);
@@ -69,6 +71,9 @@ service cloud.firestore {
         && (!('categories' in d) || (d.categories is list && d.categories.size() <= 50))
         && (!('fixedExpenses' in d) || (d.fixedExpenses is list && d.fixedExpenses.size() <= 50))
         && (!('income' in d) || (d.income is map && d.income.size() <= 600))
+        // Sobrante pasado al mes siguiente (mes -> sobre -> €) y metas de ahorro de la cartera
+        && (!('carry' in d) || (d.carry is map && d.carry.size() <= 600))
+        && (!('goals' in d) || (d.goals is list && d.goals.size() <= 50))
         && (!('wallet' in d) || (d.wallet is map && d.wallet.keys().hasOnly(['initial', 'movements'])
               && (!('initial' in d.wallet) || d.wallet.initial is number)
               && (!('movements' in d.wallet) || (d.wallet.movements is list && d.wallet.movements.size() <= 2000))));
@@ -85,15 +90,36 @@ service cloud.firestore {
     match /budgets/{uid} {
       allow read: if canUse(uid);
       allow create: if request.auth != null && request.auth.uid == uid && notDemo()
-        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet', 'themes'])
+        && request.resource.data.keys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet', 'themes', 'carry', 'goals'])
         && validBudget(request.resource.data, uid)
         && (!('themes' in request.resource.data) || okThemes(request.resource.data.themes, {}));
       allow update: if canUse(uid) && notDemo()
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet', 'themes'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['userId', 'categories', 'income', 'fixedExpenses', 'wallet', 'themes', 'carry', 'goals'])
         && validBudget(request.resource.data, uid)
         && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['themes'])
             || okThemes(request.resource.data.themes, resource.data.get('themes', {})));
       allow delete: if request.auth != null && request.auth.uid == uid && notDemo();
+    }
+
+    // Foto del ticket de un gasto (receipts/{id del gasto}): imagen reducida en data URL, del mismo presupuesto
+    match /receipts/{id} {
+      allow read, delete: if canUse(resource.data.userId) && notDemo();
+      allow create, update: if canUse(request.resource.data.userId) && notDemo()
+        && request.resource.data.keys().hasOnly(['userId', 'data', 'createdBy'])
+        && request.resource.data.data is string && request.resource.data.data.size() < 1000000
+        && request.resource.data.data.matches('^data:image/(jpeg|png|webp);base64,.*')
+        && request.resource.data.createdBy == request.auth.uid
+        && (resource == null || resource.data.userId == request.resource.data.userId);
+    }
+
+    // Avisos en el móvil (pushSubs/{uid}): suscripciones push de cada persona (endpoint -> claves) y su presupuesto.
+    // Solo las lee y escribe su dueño; el servidor las usa con la cuenta de servicio
+    match /pushSubs/{uid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid && notDemo()
+        && request.resource.data.keys().hasOnly(['budget', 'subs'])
+        && request.resource.data.budget is string && canUse(request.resource.data.budget)
+        && request.resource.data.subs is map && request.resource.data.subs.size() <= 10;
     }
 
     // Enlace de un miembro con el presupuesto que usa ({ budget: uid del dueño }). Solo lo escribe el script

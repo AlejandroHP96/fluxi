@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react"
 import { Check, Pencil, PiggyBank, Receipt, TrendingDown, Wallet, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
-import { walletBalance, type MonthStatus, type MonthSummary, type Wallet as SavingsWallet } from "../../types/budget"
+import { walletBalance, type MonthStatus, type MonthSummary, type SavingsGoal, type Wallet as SavingsWallet } from "../../types/budget"
 import { EMPTY_WALLET } from "../../utils/wallet"
 import { WalletModal } from "./WalletModal"
 import { parseAmount } from "./helpers"
@@ -13,6 +13,8 @@ interface BentoKpisProps {
   onEditFixed: () => void
   wallet: SavingsWallet | null
   onSaveWallet: (w: SavingsWallet) => Promise<boolean>
+  goals: SavingsGoal[]
+  onSaveGoals: (g: SavingsGoal[]) => Promise<boolean>
 }
 
 const STATUS_BADGES: Record<MonthStatus, { label: string; bg: string; text: string; border: string }> = {
@@ -49,6 +51,8 @@ export const BentoKpis = ({
   onEditFixed,
   wallet,
   onSaveWallet,
+  goals,
+  onSaveGoals,
 }: BentoKpisProps) => {
   const [walletOpen, setWalletOpen] = useState(false)
   const [editingIncome, setEditingIncome] = useState(false)
@@ -289,6 +293,11 @@ export const BentoKpis = ({
                 ? "Sin movimientos"
                 : "Toca para poner tu saldo"}
           </p>
+          {goals.length > 0 && (
+            <p className="mt-0.5 truncate text-xs text-cyan-200/80">
+              {goals.length === 1 ? "1 meta" : `${goals.length} metas`} · {fmt(goals.reduce((x, g) => x + g.saved, 0))} apartados
+            </p>
+          )}
         </div>
 
         <div className="mt-auto border-t border-white/[0.06] pt-2 text-[11px] text-white/60">
@@ -354,7 +363,7 @@ export const BentoKpis = ({
       {renderIncomeCard()}
       {renderSavingsCard()}
       {renderSpentCard()}
-      {walletOpen && <WalletModal wallet={wallet ?? EMPTY_WALLET} onSave={onSaveWallet} onClose={() => setWalletOpen(false)} />}
+      {walletOpen && <WalletModal wallet={wallet ?? EMPTY_WALLET} onSave={onSaveWallet} goals={goals} onSaveGoals={onSaveGoals} onClose={() => setWalletOpen(false)} />}
     </div>
   )
 }

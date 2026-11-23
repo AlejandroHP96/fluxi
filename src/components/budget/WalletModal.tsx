@@ -3,12 +3,19 @@ import { createPortal } from "react-dom"
 import { Trash2, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { newCategoryId, todayKey } from "../../utils/month"
-import { walletBalance, type Wallet } from "../../types/budget"
+import { walletBalance, type SavingsGoal, type Wallet } from "../../types/budget"
+import { GoalsSection } from "./GoalsSection"
 import { parseAmount, shortDate } from "./helpers"
 
 // Cartera de ahorros (tarjeta «Ahorro» de arriba): aparte de los sobres. Saldo inicial puesto a mano y
 // movimientos que entran o salen
-export const WalletModal = ({ wallet, onSave, onClose }: { wallet: Wallet; onSave: (w: Wallet) => Promise<boolean>; onClose: () => void }) => {
+export const WalletModal = ({ wallet, onSave, onClose, goals, onSaveGoals }: {
+  wallet: Wallet
+  onSave: (w: Wallet) => Promise<boolean>
+  onClose: () => void
+  goals: SavingsGoal[]
+  onSaveGoals: (g: SavingsGoal[]) => Promise<boolean>
+}) => {
   const [initial, setInitial] = useState(String(wallet.initial).replace(".", ","))
   const [form, setForm] = useState<{ amount: string; note: string; sign: 1 | -1 }>({ amount: "", note: "", sign: 1 })
   const [busy, setBusy] = useState(false)
@@ -149,6 +156,8 @@ export const WalletModal = ({ wallet, onSave, onClose }: { wallet: Wallet; onSav
         </div>
 
         {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+
+        <GoalsSection goals={goals} balance={balance} onSave={onSaveGoals} />
 
         {/* Historial */}
         <ul className="nice-scroll -mx-1 mt-4 flex-1 divide-y divide-white/[0.06] overflow-y-auto px-1">

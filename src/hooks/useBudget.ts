@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react"
 import {
-  addDoc, collection, deleteDoc, deleteField, doc, getDocsFromServer, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch,
+  addDoc, collection, deleteField, doc, getDoc, getDocsFromServer, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from "firebase/firestore"
 import type { Transaction } from "firebase/firestore"
 import { db } from "../lib/firebase"
 import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
-import type { BudgetCategory, Expense, FixedExpense, Members, NewExpense, Refund, Themes, Wallet } from "../types/budget"
+import type { BudgetCategory, Carry, Expense, FixedExpense, Members, NewExpense, Refund, SavingsGoal, Themes, Wallet } from "../types/budget"
 import { syncRefundMoves } from "../utils/wallet"
 import { queueSeguimiento } from "../utils/seguimientoClient"
 
@@ -62,6 +62,8 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   const [wallet, setWallet] = useState<Wallet | null>(null)
   const [members, setMembers] = useState<Members>({})
   const [themes, setThemes] = useState<Themes>({})
+  const [carry, setCarry] = useState<Carry>({})
+  const [goals, setGoals] = useState<SavingsGoal[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -74,6 +76,8 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     setWallet(null)
     setMembers({})
     setThemes({})
+    setCarry({})
+    setGoals([])
     setError(null)
     setLoading(true)
     if (!userId) return
@@ -102,6 +106,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
             ...(Array.isArray(data.refunds) && data.refunds.length ? { refunds: data.refunds as Refund[] } : {}),
             ...(typeof data.createdBy === "string" ? { createdBy: data.createdBy } : {}),
             ...(typeof data.updatedBy === "string" ? { updatedBy: data.updatedBy } : {}),
+            ...(data.receipt === true ? { receipt: true } : {}),
             _created: data.createdAt?.seconds ?? Number.MAX_SAFE_INTEGER, // recién creado (pendiente) = el más nuevo
           }
         })
@@ -120,6 +125,8 @@ const useFirestoreBudget = (authUid: string | undefined) => {
       setWallet((data?.wallet as Wallet | undefined) ?? null)
       setMembers((data?.members as Members | undefined) ?? {})
       setThemes((data?.themes as Themes | undefined) ?? {})
+      setCarry((data?.carry as Carry | undefined) ?? {})
+      setGoals((data?.goals as SavingsGoal[] | undefined) ?? [])
       markLoaded("settings")
     }, onErr("settings"))
 
@@ -182,9 +189,17 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   // Al borrar un gasto se quitan también de la cartera los movimientos de sus devoluciones
   const deleteExpense = (id: string) => {
     const e = expenses.find((x) => x.id === id)
-    if (!e?.refunds?.some((r) => r.toWallet)) return synced(run(() => deleteDoc(doc(db, "expenses", id))), monthOf(id))
+    if (!e?.refunds?.some((r) => r.toWallet)) {
+      return synced(run(async () => {
+        const batch = writeBatch(db)
+        batch.delete(doc(db, "expenses", id))
+        if (e?.receipt) batch.delete(doc(db, "receipts", id))
+        await batch.commit()
+      }), monthOf(id))
+    }
     return synced(withWallet(id, (tx, fresh, w) => {
       tx.delete(doc(db, "expenses", id))
+      if (fresh.receipt) tx.delete(doc(db, "receipts", id))
       return fresh.refunds?.some((r) => r.toWallet) ? syncRefundMoves(w, fresh.refunds, [], fresh.concept) : null
     }), monthOf(id))
   }
@@ -196,6 +211,43 @@ const useFirestoreBudget = (authUid: string | undefined) => {
       const old = fresh.refunds ?? []
       return [...old, ...refunds].some((r) => r.toWallet) ? syncRefundMoves(w, old, refunds, fresh.concept) : null
     }), e.date.slice(0, 7))
+
+  // Foto del ticket de un gasto (JPEG en data URL, ya reducida) en receipts/{id}; null la quita
+  const saveReceipt = (id: string, data: string | null) =>
+    run(async () => {
+      const batch = writeBatch(db)
+      if (data) batch.set(doc(db, "receipts", id), { userId, data, createdBy: authUid })
+      else batch.delete(doc(db, "receipts", id))
+      batch.update(doc(db, "expenses", id), { receipt: data ? true : deleteField(), updatedBy: authUid })
+      await batch.commit()
+    })
+  const loadReceipt = async (id: string): Promise<string | null> => {
+    try {
+      const s = await getDoc(doc(db, "receipts", id))
+      return (s.data()?.data as string | undefined) ?? null
+    } catch {
+      return null
+    }
+  }
+
+  // Pasar lo que sobró de un sobre al mes siguiente (month = el que lo recibe); null lo deshace
+  const saveCarry = (month: string, categoryId: string, amount: number | null) =>
+    run(() => setDoc(settingsRef(), {
+      userId,
+      carry: { [month]: { [categoryId]: amount === null ? deleteField() : Math.round(amount * 100) / 100 } },
+    }, { merge: true }))
+
+  // Metas de ahorro (lista completa)
+  const saveGoals = (list: SavingsGoal[]) =>
+    run(() => setDoc(settingsRef(), {
+      userId,
+      goals: list.map((g) => ({
+        id: g.id || newCategoryId(), name: g.name.trim().slice(0, 60),
+        target: Math.max(0, Math.round(Number(g.target) * 100) / 100) || 0,
+        saved: Math.max(0, Math.round(Number(g.saved) * 100) / 100) || 0,
+        ...(g.month ? { month: g.month } : {}),
+      })),
+    }, { merge: true }))
 
   // Cartera de ahorros completa (saldo inicial y movimientos)
   const saveWallet = (w: Wallet) => run(() => setDoc(settingsRef(), { userId, wallet: w }, { merge: true }))
@@ -239,16 +291,21 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   const resetAll = () =>
     run(async () => {
       const snap = await getDocsFromServer(query(collection(db, "expenses"), where("userId", "==", userId)))
-      const ids = snap.docs.map((d) => d.id)
+      // Fotos de tickets incluidas (se borran después de los gastos: sin el gasto ya no se ven)
+      const refs = [
+        ...snap.docs.map((d) => d.ref),
+        ...snap.docs.filter((d) => d.data().receipt === true).map((d) => doc(db, "receipts", d.id)),
+      ]
       const batch = writeBatch(db)
       batch.set(settingsRef(), {
         userId, categories: deleteField(), income: deleteField(), fixedExpenses: deleteField(), wallet: deleteField(),
+        carry: deleteField(), goals: deleteField(),
       }, { merge: true })
-      for (const id of ids.slice(0, 399)) batch.delete(doc(db, "expenses", id))
+      for (const r of refs.slice(0, 399)) batch.delete(r)
       await batch.commit()
-      for (let i = 399; i < ids.length; i += 400) {
+      for (let i = 399; i < refs.length; i += 400) {
         const rest = writeBatch(db)
-        for (const id of ids.slice(i, i + 400)) rest.delete(doc(db, "expenses", id))
+        for (const r of refs.slice(i, i + 400)) rest.delete(r)
         await rest.commit()
       }
     })
@@ -258,8 +315,8 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     // El servidor ha confirmado qué presupuesto es: hasta entonces no se ofrece crear uno (bienvenida)
     budgetConfirmed: !!authUid && link?.uid === authUid && link.confirmed,
     // Presupuesto compartido: miembros (uid -> nombre), quién ha iniciado sesión y si es el dueño
-    members, currentUid: authUid ?? null, isOwner: !!userId && userId === authUid,
-    themes, saveTheme,
+    members, currentUid: authUid ?? null, budgetUid: userId ?? null, isOwner: !!userId && userId === authUid,
+    themes, saveTheme, carry, saveCarry, goals, saveGoals, saveReceipt, loadReceipt,
     addExpense, updateExpense, deleteExpense, reassignExpenses, saveRefunds, saveWallet,
     setIncome, saveCategories, saveFixedExpenses, resetAll,
   }
@@ -339,6 +396,9 @@ const useDemoBudget = (active: boolean): BudgetApi => {
   const [income, setIncomeMap] = useState<Record<string, number>>(initial.income)
   const [wallet, setWallet] = useState<Wallet | null>(null)
   const [themes, setThemes] = useState<Themes>({})
+  const [carry, setCarry] = useState<Carry>({})
+  const [goals, setGoals] = useState<SavingsGoal[]>([])
+  const [receipts, setReceipts] = useState<Record<string, string>>({})
 
   // Al entrar de nuevo en la demo se parte de los datos de ejemplo (durante el render, sin un fotograma con lo anterior)
   const [wasActive, setWasActive] = useState(active)
@@ -351,6 +411,9 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       setFixedExpenses([])
       setIncomeMap(d.income)
       setWallet(null)
+      setCarry({})
+      setGoals([])
+      setReceipts({})
     }
   }
 
@@ -359,12 +422,38 @@ const useDemoBudget = (active: boolean): BudgetApi => {
 
   return {
     expenses, categories, fixedExpenses, income, wallet, loading: false, error: null,
-    members: {}, currentUid: DEMO_UID, isOwner: true, budgetConfirmed: true,
+    members: {}, currentUid: DEMO_UID, budgetUid: DEMO_UID as string | null, isOwner: true, budgetConfirmed: true,
     themes,
     saveTheme: (id: string) => {
       setThemes({ [DEMO_UID]: id })
       return ok()
     },
+    carry,
+    saveCarry: (month: string, categoryId: string, amount: number | null) => {
+      setCarry((c) => {
+        const m = { ...(c[month] ?? {}) }
+        if (amount === null) delete m[categoryId]
+        else m[categoryId] = Math.round(amount * 100) / 100
+        return { ...c, [month]: m }
+      })
+      return ok()
+    },
+    goals,
+    saveGoals: (list: SavingsGoal[]) => {
+      setGoals(list.map((g) => ({ ...g, id: g.id || newCategoryId() })))
+      return ok()
+    },
+    saveReceipt: (id: string, data: string | null) => {
+      setReceipts((r) => {
+        const next = { ...r }
+        if (data) next[id] = data
+        else delete next[id]
+        return next
+      })
+      setExpenses((l) => l.map((x) => (x.id === id ? { ...x, receipt: data ? true : undefined } : x)))
+      return ok()
+    },
+    loadReceipt: async (id: string) => receipts[id] ?? null,
     addExpense: async (e: NewExpense) => {
       const id = newCategoryId()
       setExpenses((l) => sortList([{ ...e, amount: Math.abs(Number(e.amount)), id, userId: DEMO_UID }, ...l]))
@@ -418,6 +507,9 @@ const useDemoBudget = (active: boolean): BudgetApi => {
       setFixedExpenses([])
       setIncomeMap({})
       setWallet(null)
+      setCarry({})
+      setGoals([])
+      setReceipts({})
       return ok()
     },
   }

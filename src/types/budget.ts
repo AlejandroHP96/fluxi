@@ -11,6 +11,7 @@ export interface Expense {
   refunds?: Refund[] // devoluciones de este gasto (compras en conjunto que te devuelven)
   createdBy?: string // uid de quien lo apuntó (los antiguos no lo tienen: son del dueño, userId)
   updatedBy?: string // uid de quien lo editó por última vez
+  receipt?: boolean // tiene foto del ticket (en receipts/{id})
 }
 
 // Dinero que te devuelven de un gasto. Si vuelve al mes, resta de lo gastado en su categoría;
@@ -46,6 +47,18 @@ export const netAmount = (e: Pick<Expense, "amount" | "refunds">) =>
 
 export type NewExpense = Pick<Expense, "amount" | "concept" | "category" | "date">
 
+// Meta de ahorro (budgets/{uid}.goals): una parte del saldo de la cartera apartada para algo concreto
+export interface SavingsGoal {
+  id: string
+  name: string
+  target: number // € que se quieren juntar
+  saved: number // € de la cartera apartados ya para esta meta
+  month?: string // "YYYY-MM": para cuándo (opcional)
+}
+
+// Sobrante pasado de un mes al siguiente (budgets/{uid}.carry): mes que lo recibe -> sobre -> €
+export type Carry = Record<string, Record<string, number>>
+
 export interface BudgetCategory {
   id: string
   name: string
@@ -74,6 +87,8 @@ export interface EnvelopeSummary {
   allocated: number // en €: su importe; en %: resto * pct / 100 (0 si no hay nómina)
   spent: number
   remaining: number // puede ser negativo
+  carriedIn: number // € que vienen del mes anterior (ya sumados en allocated)
+  carriedOut: number // € que se han pasado al mes siguiente (informativo: no cambia lo de este mes)
   pctSpent: number // gastado / asignado * 100 (0 si no hay asignado)
   status: EnvelopeStatus // casi = 90 % o más
 }

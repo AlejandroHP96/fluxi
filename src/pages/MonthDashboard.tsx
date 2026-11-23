@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from "react"
-import { AlertTriangle, Plus } from "lucide-react"
+import { AlertTriangle, ArrowRight, Plus, X } from "lucide-react"
 import type { BudgetApi } from "../hooks/useBudget"
 import { currentMonthKey, lastIncomeBefore, shiftMonth, summarizeMonth, todayKey } from "../utils/month"
 import type { Expense } from "../types/budget"
@@ -12,6 +12,7 @@ import { BentoKpis } from "../components/budget/BentoKpis"
 import { MonthCharts } from "../components/budget/MonthCharts"
 import { EnvelopesGrid } from "../components/budget/EnvelopesGrid"
 import { ExpenseList } from "../components/budget/ExpenseList"
+import { MonthCompare } from "../components/budget/MonthCompare"
 
 const ExpenseModal = lazy(() =>
   import("../components/budget/ExpenseModal").then((m) => ({ default: m.ExpenseModal }))
@@ -68,9 +69,34 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
 
   const monthExpenses = useMemo(() => expenses.filter((e) => e.date.startsWith(month)), [expenses, month])
   const summary = useMemo(
-    () => summarizeMonth(expenses, month, income[month] ?? null, categories, fixedExpenses),
-    [expenses, income, categories, fixedExpenses, month]
+    () => summarizeMonth(expenses, month, income[month] ?? null, categories, fixedExpenses, new Date(), budget.carry),
+    [expenses, income, categories, fixedExpenses, month, budget.carry]
   )
+
+  // Mes en curso: si en el anterior sobró dinero en algún sobre y aún no se ha pasado nada, se avisa (se puede cerrar)
+  const prevMonth = shiftMonth(month, -1)
+  const dismissKey = `fluxi:carry-hint:${month}`
+  const [hintClosed, setHintClosed] = useState(() => {
+    try { return localStorage.getItem(dismissKey) === "1" } catch { return false }
+  })
+  const leftovers = useMemo(() => {
+    if (!summary.isCurrent || income[prevMonth] === undefined || Object.keys(budget.carry[month] ?? {}).length) return 0
+    const prev = summarizeMonth(expenses, prevMonth, income[prevMonth], categories, fixedExpenses, new Date(), budget.carry)
+    return prev.envelopes.filter((e) => e.remaining > 0.005).length
+  }, [summary.isCurrent, income, prevMonth, month, budget.carry, expenses, categories, fixedExpenses])
+  const closeHint = () => {
+    setHintClosed(true)
+    try { localStorage.setItem(dismissKey, "1") } catch { /* sin almacenamiento */ }
+  }
+
+  // Acceso directo del icono de la app («Nuevo gasto», ver manifest): abre el formulario al entrar
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has("nuevo")) return
+    url.searchParams.delete("nuevo")
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash)
+    setModal({ kind: "new" })
+  }, [])
 
   // Gasto que se edita, el actual del listado (llega actualizado), no la copia de cuando se abrió
   const editingExpense = modal?.kind === "edit" ? (expenses.find((x) => x.id === modal.expense.id) ?? modal.expense) : null
@@ -89,6 +115,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       onSignOut={onSignOut}
       onCategories={() => openSettings("categories")}
       onTheme={() => setThemeOpen(true)}
+      push={email !== DEMO_EMAIL && uid && budget.budgetUid ? { uid, budget: budget.budgetUid } : undefined}
     />
   )
 
@@ -146,6 +173,20 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           </p>
         )}
 
+        {leftovers > 0 && !hintClosed && (
+          <div className="flex items-center gap-3 rounded-2xl border border-cyan-400/20 bg-cyan-400/[0.06] px-4 py-2.5 text-sm text-cyan-100">
+            <span className="min-w-0 flex-1">
+              El mes pasado te sobró dinero en {leftovers === 1 ? "1 sobre" : `${leftovers} sobres`}. Puedes pasarlo a este mes.
+            </span>
+            <button type="button" onClick={() => setMonth(prevMonth)} className="flex shrink-0 items-center gap-1 font-semibold text-cyan-200 hover:text-white">
+              Ver <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" onClick={closeHint} aria-label="Cerrar aviso" className="shrink-0 rounded-lg p-1 text-cyan-100/60 hover:text-white">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* Fila 1: KPIs Bento */}
         <BentoKpis
           summary={summary}
@@ -154,6 +195,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           onEditFixed={() => openSettings("fixed")}
           wallet={budget.wallet}
           onSaveWallet={budget.saveWallet}
+          goals={budget.goals}
+          onSaveGoals={budget.saveGoals}
         />
 
         {/* Fila 2: Gráficas de cada mes (Evolución diaria, Historial 6 meses, Reparto) */}
@@ -166,6 +209,8 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           summary={summary}
         />
 
+        <MonthCompare expenses={expenses} month={month} categories={categories} />
+
         {/* Fila 3: Sobres del mes (Grid) y Lista de gastos interactiva */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           <div className="lg:col-span-7 space-y-6">
@@ -173,6 +218,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
               summary={summary}
               categories={categories}
               onEdit={() => openSettings("categories")}
+              onCarry={budget.saveCarry}
             />
           </div>
           <div className="lg:col-span-5 lg:sticky lg:top-20">
@@ -229,7 +275,17 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
             categories={categories}
             onManageCategories={() => openSettings("categories")}
             defaultDate={defaultDate}
-            onSave={async (data) => (modal.kind === "edit" ? updateExpense(modal.expense.id, data) : (await addExpense(data)) !== null)}
+            onSave={async (data, receipt) => {
+              if (modal.kind === "edit") {
+                const ok = await updateExpense(modal.expense.id, data)
+                return ok && receipt !== undefined ? budget.saveReceipt(modal.expense.id, receipt) : ok
+              }
+              const id = await addExpense(data)
+              if (id === null) return false
+              if (receipt) await budget.saveReceipt(id, receipt)
+              return true
+            }}
+            loadReceipt={modal.kind === "edit" ? () => budget.loadReceipt(modal.expense.id) : undefined}
             onDelete={modal.kind === "edit" ? () => deleteExpense(modal.expense.id) : undefined}
             onSaveRefunds={
               modal.kind === "edit"

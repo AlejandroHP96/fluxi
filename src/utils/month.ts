@@ -1,4 +1,4 @@
-import { netAmount, type BudgetCategory, type EnvelopeSummary, type Expense, type FixedExpense, type MonthStatus, type MonthSummary } from "../types/budget.js"
+import { netAmount, type BudgetCategory, type Carry, type EnvelopeSummary, type Expense, type FixedExpense, type MonthStatus, type MonthSummary } from "../types/budget.js"
 
 const pad = (n: number) => String(n).padStart(2, "0")
 
@@ -48,8 +48,11 @@ export function summarizeMonth(
   income: number | null,
   categories: BudgetCategory[],
   fixedExpenses: FixedExpense[] = [],
-  today = new Date()
+  today = new Date(),
+  carry: Carry = {}
 ): MonthSummary {
+  const carriedIn = carry[month] ?? {}
+  const carriedOut = carry[shiftMonth(month, 1)] ?? {}
   const inMonth = expenses.filter((e) => e.date.startsWith(month))
   const total = daysInMonth(month)
   const current = toMonthKey(today)
@@ -78,11 +81,15 @@ export function summarizeMonth(
   const amountOver = income !== null ? Math.max(0, totalAmount - netIncome) : 0
 
   const envelope = (c: BudgetCategory): EnvelopeSummary => {
-    const allocated = isAmount(c) ? (income !== null ? Number(c.amount) || 0 : 0) : (pctBase * c.pct) / 100
+    const fromPrev = c.savings ? 0 : Number(carriedIn[c.id]) || 0
+    const allocated = (isAmount(c) ? (income !== null ? Number(c.amount) || 0 : 0) : (pctBase * c.pct) / 100) + fromPrev
     const spent = spentBy.get(c.id) || 0
     const pctSpent = allocated > 0 ? (spent / allocated) * 100 : spent > 0 ? 100 : 0
     const status = spent > allocated + 0.005 ? "pasado" : pctSpent >= NEAR_PCT ? "casi" : "ok"
-    return { category: c, allocated, spent, remaining: allocated - spent, pctSpent, status }
+    return {
+      category: c, allocated, spent, remaining: allocated - spent, pctSpent, status,
+      carriedIn: fromPrev, carriedOut: Number(carriedOut[c.id]) || 0,
+    }
   }
 
   const totalPct = categories.reduce((a, c) => a + (isAmount(c) ? 0 : Number(c.pct) || 0), 0)
@@ -91,7 +98,9 @@ export function summarizeMonth(
   const envelopes = categories.filter((c) => !c.savings).map(envelope)
   const saved = savings.reduce((a, s) => a + s.allocated, 0)
   const spent = inMonth.reduce((a, e) => a + netAmount(e), 0)
-  const spendable = income !== null ? (rawIncome - totalFixed) - saved : 0
+  // Lo que viene del mes anterior es dinero de más para gastar (solo en sobres de gasto que siguen existiendo)
+  const totalCarry = envelopes.reduce((a, e) => a + e.carriedIn, 0)
+  const spendable = (income !== null ? (rawIncome - totalFixed) - saved : 0) + totalCarry
   const available = spendable - spent
   const pctSpent = spendable > 0 ? (spent / spendable) * 100 : 0
 

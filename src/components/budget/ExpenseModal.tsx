@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
-import { X, Trash2, Undo2, PiggyBank } from "lucide-react"
+import { X, Trash2, Undo2, PiggyBank, Camera } from "lucide-react"
 import { daysInMonth, resolveCategory } from "../../utils/month"
 import { fmt } from "../../utils/formatters"
 import { netAmount, type BudgetCategory, type Expense, type NewExpense, type Refund } from "../../types/budget"
@@ -8,6 +8,7 @@ import { CategoryChip } from "./CategoryChip"
 import { catColor, getLastCategory, parseAmount, saveLastCategory } from "./helpers"
 import { newCategoryId, todayKey } from "../../utils/month"
 import { conceptSuggestions, type Suggestion } from "../../utils/suggest"
+import { compressImage } from "../../utils/image"
 
 interface ExpenseModalProps {
   expense: Expense | null // null = gasto nuevo
@@ -15,7 +16,9 @@ interface ExpenseModalProps {
   categories: BudgetCategory[] // las del usuario
   onManageCategories: () => void
   defaultDate: string // fecha por defecto del gasto nuevo
-  onSave: (data: NewExpense) => Promise<boolean>
+  // receipt: foto del ticket nueva (data URL), null = quitarla, undefined = sin cambios
+  onSave: (data: NewExpense, receipt?: string | null) => Promise<boolean>
+  loadReceipt?: () => Promise<string | null> // al editar un gasto con foto
   onDelete?: () => Promise<boolean>
   onSaveRefunds?: (refunds: Refund[]) => Promise<boolean> // solo al editar
   onClose: () => void
@@ -24,7 +27,7 @@ interface ExpenseModalProps {
 }
 
 export const ExpenseModal = ({
-  expense, month, categories, onManageCategories, defaultDate, onSave, onDelete, onSaveRefunds, onClose, authorship, history = [],
+  expense, month, categories, onManageCategories, defaultDate, onSave, onDelete, onSaveRefunds, onClose, authorship, history = [], loadReceipt,
 }: ExpenseModalProps) => {
   const editing = expense !== null
   const spendCats = categories.filter((c) => !c.savings)
@@ -89,6 +92,42 @@ export const ExpenseModal = ({
     setErrors({})
   }
 
+  // Foto del ticket: la que ya tenía se carga aparte (no viaja con la lista de gastos)
+  const [receipt, setReceipt] = useState<string | null | undefined>(undefined)
+  const [preview, setPreview] = useState<string | null>(null)
+  const [receiptState, setReceiptState] = useState<"idle" | "loading" | "error">(expense?.receipt ? "loading" : "idle")
+  const [zoom, setZoom] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!expense?.receipt || !loadReceipt) return
+    let alive = true
+    loadReceipt().then((url) => {
+      if (!alive) return
+      setPreview(url)
+      setReceiptState(url ? "idle" : "error")
+    })
+    return () => { alive = false }
+    // Solo al abrir: después manda lo que se elija aquí
+  }, [])
+  const pickPhoto = async (file: File | undefined) => {
+    if (!file) return
+    setReceiptState("loading")
+    try {
+      const url = await compressImage(file)
+      setReceipt(url)
+      setPreview(url)
+      setReceiptState("idle")
+    } catch {
+      setReceiptState("error")
+    }
+  }
+  const removePhoto = () => {
+    setPreview(null)
+    setReceiptState("idle")
+    // Solo se borra en el servidor si el gasto ya tenía foto
+    setReceipt(expense?.receipt ? null : undefined)
+  }
+
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     if (busy) return
@@ -98,7 +137,7 @@ export const ExpenseModal = ({
     if (errs.amount || errs.concept || errs.date || errs.category) return
     setBusy(true)
     setFailed(false)
-    const ok = await onSave({ amount: Math.round(n * 100) / 100, concept: concept.trim(), category, date })
+    const ok = await onSave({ amount: Math.round(n * 100) / 100, concept: concept.trim(), category, date }, receipt)
     if (ok) {
       saveLastCategory(category)
       onClose()
@@ -266,6 +305,51 @@ export const ExpenseModal = ({
             className={`${field} ${errors.date ? bad : ""}`}
           />
         </div>
+
+        {/* Foto del ticket */}
+        <div className="mt-4">
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              void pickPhoto(e.target.files?.[0])
+              e.target.value = ""
+            }}
+          />
+          {preview ? (
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setZoom(true)} aria-label="Ver la foto del ticket" className="shrink-0 overflow-hidden rounded-lg border border-white/10">
+                <img src={preview} alt="Ticket" className="h-16 w-16 object-cover" />
+              </button>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
+                <button type="button" onClick={() => fileRef.current?.click()} className="font-medium text-cyan-300 hover:text-cyan-200">Cambiar foto</button>
+                <button type="button" onClick={removePhoto} className="text-white/60 hover:text-red-300">Quitar</button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={receiptState === "loading"}
+              className="flex items-center gap-1.5 text-sm font-medium text-cyan-300 hover:text-cyan-200 disabled:opacity-60"
+            >
+              <Camera className="h-4 w-4" />
+              {receiptState === "loading" ? "Cargando foto…" : "Añadir foto del ticket"}
+            </button>
+          )}
+          {receiptState === "error" && <p className="mt-1.5 text-xs text-red-300">No se ha podido cargar la foto. Prueba con otra.</p>}
+        </div>
+
+        {zoom && preview && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 p-4" onClick={() => setZoom(false)} role="dialog" aria-label="Foto del ticket">
+            <img src={preview} alt="Ticket" className="max-h-full max-w-full rounded-lg object-contain" />
+            <button type="button" aria-label="Cerrar foto" className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] rounded-full bg-white/10 p-2 text-white">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
 
         {editing && onSaveRefunds && (
           <div className="mt-5 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3.5">

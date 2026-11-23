@@ -254,3 +254,19 @@ describe("summarizeMonth: sobres en € y en %", () => {
     expect(s.unassigned).toBe(700)
   })
 })
+
+describe("summarizeMonth con sobrante pasado", () => {
+  const cats = [
+    { id: "a", name: "A", pct: 50, savings: false },
+    { id: "b", name: "B", pct: 50, savings: false },
+  ]
+  it("suma lo que viene del mes anterior al sobre y a lo disponible, y marca lo que sale", () => {
+    const carry = { "2026-11": { a: 30 }, "2026-12": { b: 10 } }
+    const s = summarizeMonth([], "2026-11", 1000, cats, [], new Date(2026, 10, 15), carry)
+    expect(s.envelopes[0].allocated).toBe(530)
+    expect(s.envelopes[0].carriedIn).toBe(30)
+    expect(s.envelopes[1].carriedOut).toBe(10)
+    expect(s.envelopes[1].allocated).toBe(500)
+    expect(s.spendable).toBe(1030)
+  })
+})

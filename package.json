@@ -14,12 +14,14 @@
     "firebase": "^13.4.0",
     "lucide-react": "^1.75.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^6.0.0",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@types/web-push": "3.6.4",
     "@vitejs/plugin-react": "^4.2.0",
     "autoprefixer": "^10.4.17",
     "postcss": "^8.4.35",

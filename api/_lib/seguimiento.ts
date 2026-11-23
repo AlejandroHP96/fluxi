@@ -1,4 +1,4 @@
-import { netAmount, type BudgetCategory, type Expense, type FixedExpense, type Members, type MonthStatus } from "../../src/types/budget.js"
+import { netAmount, type BudgetCategory, type Carry, type Expense, type FixedExpense, type Members, type MonthStatus } from "../../src/types/budget.js"
 import { daysInMonth, monthLabel, resolveCategory, summarizeMonth } from "../../src/utils/month.js"
 import { authorName } from "../../src/utils/members.js"
 
@@ -16,6 +16,8 @@ export interface BudgetDoc {
   fixedExpenses?: FixedExpense[]
   income?: Record<string, number>
   members?: Members
+  carry?: Carry // sobrante pasado de un mes al siguiente
+  alerts?: Record<string, string[]> // avisos ya enviados (ver alerts.ts)
 }
 
 // Rango de celdas (filas y columnas desde 0, el final no incluido)
@@ -96,7 +98,7 @@ export function buildMonthSheet(month: string, expenses: Expense[], budget: Budg
   const categories = budget.categories ?? []
   const income = budget.income?.[month] ?? null
   const fixed = budget.fixedExpenses ?? []
-  const s = summarizeMonth(expenses, month, income, categories, fixed, today)
+  const s = summarizeMonth(expenses, month, income, categories, fixed, today, budget.carry ?? {})
   const members = budget.members ?? {}
   const shared = Object.keys(members).length > 1
   const list = expenses.filter((e) => e.date.startsWith(month)).sort((a, b) => a.date.localeCompare(b.date))

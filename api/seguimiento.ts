@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto"
 import { accessToken, fromFields, gfetch, serviceAccount } from "./_lib/google.js"
+import { sendBudgetAlerts } from "./_lib/push.js"
 import { buildMonthSheet, monthsOfLastWeek, tabTitle, type BudgetDoc, type CellRange, type MonthSheet, type Style, type Tone } from "./_lib/seguimiento.js"
 import type { Expense } from "../src/types/budget.js"
 
@@ -205,6 +206,13 @@ export async function GET(request: Request): Promise<Response> {
     const expenses = found
       .filter((r) => r.document)
       .map((r) => ({ id: r.document!.name.split("/").pop()!, ...fromFields(r.document!.fields) }) as Expense)
+
+    // Llamada de la app tras cambiar un gasto: avisos de sobres al 80 % (si fallan, la hoja se rehace igual)
+    if (uid) {
+      for (const month of months) {
+        await sendBudgetAlerts(token, docs, owner, month, expenses, budget).catch((e) => console.error("avisos", e))
+      }
+    }
 
     const api = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(sheetId)}`
     const done = []

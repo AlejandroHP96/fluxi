@@ -152,6 +152,47 @@ await t("desconocido no pone tema", assertFails(setDoc(doc(o, "budgets/u1"), { u
 await t("crear budget con tema propio", assertSucceeds(setDoc(doc(env.authenticatedContext("u5").firestore(), "budgets/u5"), { userId: "u5", themes: { u5: "rosa" } })))
 await t("crear budget con tema ajeno no", assertFails(setDoc(doc(env.authenticatedContext("u4").firestore(), "budgets/u4"), { userId: "u4", themes: { zz: "rosa" } })))
 
+// --- Sobrante al mes siguiente y metas de ahorro ---
+await t("pasar sobrante", assertSucceeds(setDoc(doc(m, "budgets/u1"), { userId: "u1", carry: { "2026-12": { a: 25.5 } } }, { merge: true })))
+await t("deshacer sobrante", assertSucceeds(setDoc(doc(m, "budgets/u1"), { userId: "u1", carry: { "2026-12": { a: deleteField() } } }, { merge: true })))
+await t("carry no mapa no", assertFails(setDoc(doc(u, "budgets/u1"), { userId: "u1", carry: "x" }, { merge: true })))
+await t("metas", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", goals: [{ id: "g", name: "Viaje", target: 1500, saved: 200, month: "2027-06" }] }, { merge: true })))
+await t("metas no lista no", assertFails(setDoc(doc(u, "budgets/u1"), { userId: "u1", goals: { a: 1 } }, { merge: true })))
+
+// --- Foto del ticket ---
+const img = "data:image/jpeg;base64,AAAA"
+await env.withSecurityRulesDisabled(async c => {
+  await setDoc(doc(c.firestore(), "expenses/conticket"), { userId: "u1", amount: 5, concept: "Lidl", category: "c1", date: "2026-11-20" })
+})
+await t("miembro pone ticket", assertSucceeds((async () => {
+  const batch = writeBatch(m)
+  batch.set(doc(m, "receipts/conticket"), { userId: "u1", data: img, createdBy: "m1" })
+  batch.update(doc(m, "expenses/conticket"), { receipt: true, updatedBy: "m1" })
+  await batch.commit()
+})()))
+await t("dueño lee ticket", assertSucceeds(getDoc(doc(u, "receipts/conticket"))))
+await t("desconocido no lee ticket", assertFails(getDoc(doc(o, "receipts/conticket"))))
+await t("ticket que no es imagen no", assertFails(setDoc(doc(u, "receipts/x1"), { userId: "u1", data: "hola", createdBy: "u1" })))
+await t("ticket enorme no", assertFails(setDoc(doc(u, "receipts/x2"), { userId: "u1", data: img + "A".repeat(1000000), createdBy: "u1" })))
+await t("ticket firmado por otro no", assertFails(setDoc(doc(u, "receipts/x3"), { userId: "u1", data: img, createdBy: "m1" })))
+await t("ticket en presupuesto ajeno no", assertFails(setDoc(doc(o, "receipts/x4"), { userId: "u1", data: img, createdBy: "u2" })))
+await t("receipt no booleano no", assertFails(updateDoc(doc(u, "expenses/conticket"), { receipt: "x" })))
+await t("quitar ticket", assertSucceeds((async () => {
+  const batch = writeBatch(u)
+  batch.delete(doc(u, "receipts/conticket"))
+  batch.update(doc(u, "expenses/conticket"), { receipt: deleteField(), updatedBy: "u1" })
+  await batch.commit()
+})()))
+
+// --- Suscripciones push ---
+const sub = { budget: "u1", subs: { k1: { endpoint: "https://push.example/1", keys: { p256dh: "p", auth: "a" } } } }
+await t("miembro guarda su suscripción", assertSucceeds(setDoc(doc(m, "pushSubs/m1"), sub)))
+await t("miembro lee la suya", assertSucceeds(getDoc(doc(m, "pushSubs/m1"))))
+await t("otro no lee la ajena", assertFails(getDoc(doc(u, "pushSubs/m1"))))
+await t("suscripción a presupuesto ajeno no", assertFails(setDoc(doc(o, "pushSubs/u2"), sub)))
+await t("suscripción con campo extra no", assertFails(setDoc(doc(m, "pushSubs/m1"), { ...sub, hack: 1 })))
+await t("escribir la de otro no", assertFails(setDoc(doc(u, "pushSubs/m1"), sub)))
+
 await env.cleanup()
 console.log(failures ? `\n${failures} caso(s) fallidos` : "\nTodos los casos en verde")
 process.exit(failures ? 1 : 0)
