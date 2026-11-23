@@ -364,4 +364,4 @@ git commit -m "feat: script para enlazar y desenlazar miembros del presupuesto" 
 - [x] Revisión del diff por otro agente; corregir lo que salga.
 - [x] `firebase deploy --only firestore:rules --project dashboard-finance-48b7f`. (comprobado el 2026-11-23: ya estaban al día)
 - [x] `git push` a `main` (Vercel despliega).
-- [ ] Vault: `Inicio.md` (esquema y reglas) y nota `shared-budget` al día. El enlace (`link --apply`) espera el email de ella y la confirmación del dueño.
+- [x] Vault: `Inicio.md` (esquema y reglas) y nota `shared-budget` al día. El enlace (`link --apply`) espera el email de ella y la confirmación del dueño.
