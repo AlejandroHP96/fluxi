@@ -215,7 +215,7 @@ export async function GET(request: Request): Promise<Response> {
         body: { requests: [{ updateSheetProperties: { properties: { sheetId: tabId, title: month }, fields: "title" } }] },
       })
 
-      await gfetch(token, `${api}/values/${encodeURIComponent(`'${month}'!A1`)}?valueInputOption=USER_ENTERED`, {
+      await gfetch(token, `${api}/values/${encodeURIComponent(`'${month}'!A1`)}?valueInputOption=RAW`, {
         method: "PUT",
         body: { values: sheet.rows },
       })
