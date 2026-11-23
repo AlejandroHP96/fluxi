@@ -5,19 +5,35 @@ import type { Expense } from "../src/types/budget.js"
 
 // Cron de Vercel (cada lunes, ver vercel.json): pone al día en el «Seguimiento» de Google Sheets la pestaña
 // de cada mes de la semana que acaba de terminar (uno, o dos si la semana cruza de mes; así el mes que
-// cierra queda completo). ?month=YYYY-MM rehace (o crea) la de ese mes. La pestaña se crea de nuevo cada
+// cierra queda completo). ?month=YYYY-MM rehace (o crea) la de ese mes (lo usa también el botón «Actualizar»
+// de la app, solo para el dueño, con su ID token de Firebase). La pestaña se crea de nuevo cada
 // vez (con sus gráficas), en el mismo sitio, así que repetirlo no duplica nada.
 //
 // Variables de Vercel: CRON_SECRET (Vercel lo manda como «Authorization: Bearer …»), FIREBASE_SERVICE_ACCOUNT
 // (JSON de la cuenta de servicio; la hoja tiene que estar compartida con su client_email como editor),
 // SEGUIMIENTO_SHEET_ID y FLUXI_OWNER_UID (uid del dueño del presupuesto).
 
-const authorized = (header: string | null) => {
+const isCron = (header: string | null) => {
   const secret = process.env.CRON_SECRET
   if (!secret || !header) return false
   const a = Buffer.from(header)
   const b = Buffer.from(`Bearer ${secret}`)
   return a.length === b.length && timingSafeEqual(a, b)
+}
+
+// Botón «Actualizar» de la app: el ID token de Firebase tiene que ser del dueño del presupuesto
+async function isOwner(header: string | null, owner: string): Promise<boolean> {
+  const idToken = (header ?? "").replace(/^Bearer\s+/i, "")
+  const apiKey = process.env.VITE_FIREBASE_API_KEY
+  if (!idToken || !apiKey) return false
+  const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken }),
+  })
+  if (!r.ok) return false
+  const d = (await r.json()) as { users?: Array<{ localId?: string }> }
+  return d.users?.[0]?.localId === owner
 }
 
 const json = (status: number, body: unknown) =>
@@ -156,10 +172,11 @@ function formatRequests(tabId: number, sheet: MonthSheet) {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  if (!authorized(request.headers.get("authorization"))) return json(401, { error: "No autorizado" })
   const sheetId = process.env.SEGUIMIENTO_SHEET_ID
   const owner = process.env.FLUXI_OWNER_UID
   if (!sheetId || !owner) return json(500, { error: "Faltan SEGUIMIENTO_SHEET_ID o FLUXI_OWNER_UID" })
+  const header = request.headers.get("authorization")
+  if (!isCron(header) && !(await isOwner(header, owner))) return json(401, { error: "No autorizado" })
 
   const asked = new URL(request.url).searchParams.get("month")
   if (asked && !/^\d{4}-(0[1-9]|1[0-2])$/.test(asked)) return json(400, { error: "month tiene que ser YYYY-MM" })
