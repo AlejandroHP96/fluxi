@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto"
 import { accessToken, fromFields, gfetch, serviceAccount } from "./_lib/google.js"
-import { buildMonthSheet, monthsOfLastWeek, type BudgetDoc, type CellRange, type MonthSheet, type Style, type Tone } from "./_lib/seguimiento.js"
+import { buildMonthSheet, monthsOfLastWeek, tabTitle, type BudgetDoc, type CellRange, type MonthSheet, type Style, type Tone } from "./_lib/seguimiento.js"
 import type { Expense } from "../src/types/budget.js"
 
 // Cron de Vercel (cada lunes, ver vercel.json): pone al día en el «Seguimiento» de Google Sheets la pestaña
@@ -190,19 +190,21 @@ export async function GET(request: Request): Promise<Response> {
     const done = []
     for (const month of months) {
       const sheet = buildMonthSheet(month, expenses, budget)
+      const title = tabTitle(month)
 
       // Pestaña nueva en el sitio de la anterior (si la había): así no quedan gráficas, combinaciones ni
       // formatos viejos. Se crea con otro nombre, se borra la vieja y se renombra (no se puede borrar la única)
       const meta = await gfetch<{ sheets: Array<{ properties: { sheetId: number; title: string; index: number } }> }>(
         token, `${api}?fields=sheets.properties`,
       )
-      const old = meta.sheets.find((s) => s.properties.title === month)?.properties
+      // Las pestañas antiguas se llamaban «2026-11»: también se sustituyen
+      const old = meta.sheets.find((s) => s.properties.title === title || s.properties.title === month)?.properties
       const blank = meta.sheets.find((s) => /^(Hoja ?1|Sheet1)$/.test(s.properties.title))?.properties
       const added = await gfetch<{ replies: Array<{ addSheet?: { properties: { sheetId: number } } }> }>(token, `${api}:batchUpdate`, {
         method: "POST",
         body: {
           requests: [
-            { addSheet: { properties: { title: `${month} (nueva)`, index: old ? old.index : 0, gridProperties: { rowCount: Math.max(200, sheet.rows.length + 60), columnCount: 20 } } } },
+            { addSheet: { properties: { title: `${title} (nueva)`, index: old ? old.index : 0, gridProperties: { rowCount: Math.max(200, sheet.rows.length + 60), columnCount: 20 } } } },
             ...(old ? [{ deleteSheet: { sheetId: old.sheetId } }] : []),
             // La hoja vacía con la que nace el archivo («Hoja 1») sobra en cuanto hay un mes
             ...(blank ? [{ deleteSheet: { sheetId: blank.sheetId } }] : []),
@@ -212,15 +214,15 @@ export async function GET(request: Request): Promise<Response> {
       const tabId = added.replies[0].addSheet!.properties.sheetId
       await gfetch(token, `${api}:batchUpdate`, {
         method: "POST",
-        body: { requests: [{ updateSheetProperties: { properties: { sheetId: tabId, title: month }, fields: "title" } }] },
+        body: { requests: [{ updateSheetProperties: { properties: { sheetId: tabId, title }, fields: "title" } }] },
       })
 
-      await gfetch(token, `${api}/values/${encodeURIComponent(`'${month}'!A1`)}?valueInputOption=RAW`, {
+      await gfetch(token, `${api}/values/${encodeURIComponent(`'${title}'!A1`)}?valueInputOption=RAW`, {
         method: "PUT",
         body: { values: sheet.rows },
       })
       await gfetch(token, `${api}:batchUpdate`, { method: "POST", body: { requests: formatRequests(tabId, sheet) } })
-      done.push({ month, expenses: expenses.filter((e) => e.date.startsWith(month)).length })
+      done.push({ month, tab: title, expenses: expenses.filter((e) => e.date.startsWith(month)).length })
     }
 
     return json(200, { months: done, sheet: `https://docs.google.com/spreadsheets/d/${sheetId}` })

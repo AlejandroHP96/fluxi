@@ -74,6 +74,11 @@ const DATA = 14
 const WIDTHS = [110, 210, 130, 110, 110, 95, 120, 24, 150, 70, 110, 110, 110, 24, 60, 110, 110]
 const COLORS = { spent: "#0891b2", budget: "#cbd5e1", pace: "#94a3b8" }
 
+const MONTH_NAME = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
+
+// Nombre de la pestaña de un mes: "2026-11" -> "Noviembre 26"
+export const tabTitle = (month: string) => `${MONTH_NAME[Number(month.slice(5, 7)) - 1]} ${month.slice(2, 4)}`
+
 // Semanas de lunes a domingo, recortadas al mes: [día de inicio, día de fin]
 export function weeksOfMonth(month: string): Array<[number, number]> {
   const [y, m] = month.split("-").map(Number)

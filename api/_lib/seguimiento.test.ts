@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildMonthSheet, monthsOfLastWeek, weeksOfMonth, type MonthSheet } from "./seguimiento"
+import { buildMonthSheet, monthsOfLastWeek, tabTitle, weeksOfMonth, type MonthSheet } from "./seguimiento"
 import type { Expense } from "../../src/types/budget"
 
 const categories = [
@@ -102,6 +102,13 @@ describe("buildMonthSheet", () => {
     expect(empty.rows[4][0]).toBe("Sin apuntar")
     expect(empty.rows[4][5]).toBe("Sin nómina")
     expect(empty.rows.flat()).toContain("Sin gastos este mes")
+  })
+})
+
+describe("tabTitle", () => {
+  it("mes con nombre y año corto", () => {
+    expect(tabTitle("2026-11")).toBe("Noviembre 26")
+    expect(tabTitle("2027-01")).toBe("Enero 27")
   })
 })
 
