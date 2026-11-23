@@ -1,4 +1,4 @@
-import { netAmount, type BudgetCategory, type EnvelopeSummary, type Expense, type FixedExpense, type MonthStatus, type MonthSummary } from "../types/budget"
+import { netAmount, type BudgetCategory, type EnvelopeSummary, type Expense, type FixedExpense, type MonthStatus, type MonthSummary } from "../types/budget.js"
 
 const pad = (n: number) => String(n).padStart(2, "0")
 

@@ -17,6 +17,7 @@ jobs:
           cache: yarn
       - run: yarn install --frozen-lockfile
       - run: npx tsc --noEmit -p .
+      - run: npx tsc --noEmit -p tsconfig.api.json
       - run: yarn vitest run
       - run: yarn build
 

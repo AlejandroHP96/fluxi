@@ -1,4 +1,4 @@
-import type { Expense, Members } from "../types/budget"
+import type { Expense, Members } from "../types/budget.js"
 
 // Hay alguien más que el dueño: solo entonces se enseña quién hizo cada cosa
 export const isShared = (members: Members) => Object.keys(members).length > 1
