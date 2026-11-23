@@ -8,7 +8,12 @@ import { ZK_VIEWBOX } from "./ZkLogo"
 // Si ese logo no está visible (móvil, sin barra lateral), se desvanece en el centro.
 
 const LOGO_SIZE = 180
-const MIN_ASSEMBLE_MS = 700
+// El logo siempre se ensambla entero antes de volar, aunque la sesión cargue antes: la última pieza (la K)
+// empieza a 0,85 s y dura 0,8 s (index.css), más una pausa corta para que se vea completo.
+// Con «reducir movimiento» las animaciones duran 0,01 s y no hace falta esperar
+const ASSEMBLE_MS = 1650 + 150
+const MIN_ASSEMBLE_MS =
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? 300 : ASSEMBLE_MS
 const FLY_MS = 600
 
 interface Target {
