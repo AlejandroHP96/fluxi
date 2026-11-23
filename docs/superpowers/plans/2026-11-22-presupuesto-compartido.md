@@ -31,7 +31,7 @@
 **Interfaces:**
 - Produces: colecciones `links/{uid}` (`{ budget }`), campo `budgets/{uid}.members` (`{ [uid]: nombre }`), campos `expenses.createdBy`/`updatedBy`.
 
-- [ ] **Step 1: Tests de miembros (antes de `await env.cleanup()`)**
+- [x] **Step 1: Tests de miembros (antes de `await env.cleanup()`)**
 
 ```js
 // --- Presupuesto compartido: u1 dueño, m1 miembro, x1 desconocido ---
@@ -70,12 +70,12 @@ await t("miembro borra gasto", assertSucceeds(deleteDoc(doc(m, "expenses/shared1
 
 Añadir `getDocs, query, where` al import de `firebase/firestore`.
 
-- [ ] **Step 2: Ejecutar y ver fallar**
+- [x] **Step 2: Ejecutar y ver fallar**
 
 Run: `npx -y firebase-tools@15.37.0 emulators:exec --config firebase.test.json --only firestore --project demo-fluxi "node tests/firestore.rules.test.mjs"`
 Expected: FAIL en los casos de miembro (p. ej. «miembro consulta gastos del dueño»).
 
-- [ ] **Step 3: Reglas**
+- [x] **Step 3: Reglas**
 
 En `firestore.rules`:
 - `owns(data)` pasa a `canUse(data.userId)`:
@@ -96,12 +96,12 @@ En `firestore.rules`:
 - `budgets/{uid}`: `read`/`update` con `canUse(uid)`; `create`/`delete` con `request.auth.uid == uid`. `members` fuera de las claves permitidas en `create` y `update`.
 - `match /links/{uid} { allow read: if request.auth != null && request.auth.uid == uid; }`
 
-- [ ] **Step 4: Ejecutar y ver pasar**
+- [x] **Step 4: Ejecutar y ver pasar**
 
 Run: el mismo comando del Step 2.
 Expected: «Todos los casos en verde».
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add firestore.rules tests/firestore.rules.test.mjs
@@ -122,7 +122,7 @@ git commit -m "feat: reglas de Firestore para compartir el presupuesto con miemb
   - `authorName(e: Pick<Expense,"userId"|"createdBy">, members: Members): string | null`
   - `authorshipLabel(e: Pick<Expense,"userId"|"createdBy"|"updatedBy">, members: Members): string | null`
 
-- [ ] **Step 1: Test**
+- [x] **Step 1: Test**
 
 ```ts
 import { describe, expect, it } from "vitest"
@@ -157,12 +157,12 @@ describe("members", () => {
 })
 ```
 
-- [ ] **Step 2: Ejecutar y ver fallar**
+- [x] **Step 2: Ejecutar y ver fallar**
 
 Run: `yarn vitest run src/utils/members.test.ts`
 Expected: FAIL (no existe `./members`).
 
-- [ ] **Step 3: Implementación**
+- [x] **Step 3: Implementación**
 
 `src/types/budget.ts`, en `Expense`:
 
@@ -200,12 +200,12 @@ export function authorshipLabel(e: Pick<Expense, "userId" | "createdBy" | "updat
 }
 ```
 
-- [ ] **Step 4: Ejecutar y ver pasar**
+- [x] **Step 4: Ejecutar y ver pasar**
 
 Run: `yarn vitest run src/utils/members.test.ts`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/utils/members.ts src/utils/members.test.ts src/types/budget.ts
@@ -221,7 +221,7 @@ git commit -m "feat: autoría de los gastos a partir de los miembros del presupu
 - Consumes: `Members` (Task 2), `links/{uid}` (Task 1).
 - Produces: `BudgetApi` gana `members: Members`, `currentUid: string | null`, `isOwner: boolean`.
 
-- [ ] **Step 1: Resolver el presupuesto**
+- [x] **Step 1: Resolver el presupuesto**
 
 En `useFirestoreBudget`, renombrar el parámetro a `authUid` y añadir al principio:
 
@@ -243,27 +243,27 @@ En `useFirestoreBudget`, renombrar el parámetro a `authUid` y añadir al princi
 
 El resto del hook sigue usando `userId` (ahora el uid del presupuesto).
 
-- [ ] **Step 2: Miembros**
+- [x] **Step 2: Miembros**
 
 Estado `const [members, setMembers] = useState<Members>({})`, se limpia con los demás y en el snapshot de ajustes: `setMembers((data?.members as Members | undefined) ?? {})`.
 
-- [ ] **Step 3: Firmar**
+- [x] **Step 3: Firmar**
 
 - `addExpense`: `{ ...e, amount, userId, createdBy: authUid, updatedBy: authUid, createdAt: serverTimestamp() }`.
 - `updateExpense`: `{ ...e, amount, updatedBy: authUid }`.
 - `saveRefunds`: `tx.update(doc(db, "expenses", e.id), { refunds, updatedBy: authUid })`.
 - En el mapeo del snapshot de gastos: `...(data.createdBy ? { createdBy: data.createdBy } : {})` y lo mismo con `updatedBy`.
 
-- [ ] **Step 4: Devolver**
+- [x] **Step 4: Devolver**
 
 Añadir `members, currentUid: authUid ?? null, isOwner: !!userId && userId === authUid` al objeto devuelto. En `useDemoBudget`: `members: {}, currentUid: DEMO_UID, isOwner: true`.
 
-- [ ] **Step 5: Comprobar tipos y tests**
+- [x] **Step 5: Comprobar tipos y tests**
 
 Run: `npx tsc --noEmit -p . && yarn test`
 Expected: sin errores; todos los tests en verde.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/hooks/useBudget.ts
@@ -278,7 +278,7 @@ git commit -m "feat: cargar el presupuesto enlazado y firmar los gastos" -m "Tar
 **Interfaces:**
 - Consumes: `isShared`, `authorName`, `authorshipLabel` (Task 2); `budget.members`, `budget.isOwner` (Task 3).
 
-- [ ] **Step 1: `ExpenseList`**
+- [x] **Step 1: `ExpenseList`**
 
 Prop nueva `members: Members`. `const shared = isShared(members)`. En el filtro de búsqueda, añadir `|| (shared && (authorName(e, members) ?? "").toLowerCase().includes(q))`. En cada fila, antes del importe y solo si `shared`:
 
@@ -295,7 +295,7 @@ Prop nueva `members: Members`. `const shared = isShared(members)`. En el filtro 
 
 Placeholder del buscador: `shared ? "Buscar por comercio, concepto o quién…" : "Buscar por comercio o concepto…"`.
 
-- [ ] **Step 2: `ExpenseModal`**
+- [x] **Step 2: `ExpenseModal`**
 
 Prop nueva `authorship?: string | null`. Bajo el `<h2>`, envolver título y línea:
 
@@ -306,23 +306,23 @@ Prop nueva `authorship?: string | null`. Bajo el `<h2>`, envolver título y lín
 </div>
 ```
 
-- [ ] **Step 3: `AppHeader`**
+- [x] **Step 3: `AppHeader`**
 
 `onImport?: () => void`; el botón de importar solo se pinta si `onImport`.
 
-- [ ] **Step 4: `MonthDashboard`**
+- [x] **Step 4: `MonthDashboard`**
 
 - `onImport={budget.isOwner ? () => setImporting(true) : undefined}`.
 - `onResetAll={budget.isOwner ? async () => { ... } : undefined}` (el cuerpo actual).
 - `ExpenseList members={budget.members}`.
 - `ExpenseModal authorship={modal.kind === "edit" ? authorshipLabel(<gasto actual>, budget.members) : null}`; el gasto actual es el mismo que ya se pasa en `expense`.
 
-- [ ] **Step 5: Comprobar**
+- [x] **Step 5: Comprobar**
 
 Run: `npx tsc --noEmit -p . && yarn test && yarn build`
 Expected: todo en verde.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/components/budget/ExpenseList.tsx src/components/budget/ExpenseModal.tsx src/components/budget/AppHeader.tsx src/pages/MonthDashboard.tsx
@@ -337,7 +337,7 @@ git commit -m "feat: ver quién apuntó y editó cada gasto; el miembro no impor
 **Interfaces:**
 - Consumes: `budgets/{owner}.members`, `links/{uid}` (Task 1).
 
-- [ ] **Step 1: Script**
+- [x] **Step 1: Script**
 
 - Token: `require(<npm root -g>/firebase-tools/lib/auth.js)`, `getGlobalDefaultAccount()` + `getAccessToken(refresh_token, [cloud-platform])`. La raíz global se saca con `execSync("npm root -g")`.
 - `lookup(email)`: `POST https://identitytoolkit.googleapis.com/v1/projects/dashboard-finance-48b7f/accounts:lookup` con `{ email: [email] }` → `users[0].localId`.
@@ -346,12 +346,12 @@ git commit -m "feat: ver quién apuntó y editó cada gasto; el miembro no impor
 - `unlink <email>`: quita el uid de `members` y borra `links/{uid}`, mismo modo lectura/`--apply`.
 - Rechaza enlazar al propio dueño o a la demo.
 
-- [ ] **Step 2: Probar en modo lectura**
+- [x] **Step 2: Probar en modo lectura**
 
 Run: `node scripts/members.cjs link nadie@example.com Prueba`
 Expected: error «No hay ninguna cuenta con ese email» y nada escrito.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add scripts/members.cjs
@@ -360,8 +360,8 @@ git commit -m "feat: script para enlazar y desenlazar miembros del presupuesto" 
 
 ### Task 6: Verificación, revisión y despliegue
 
-- [ ] `npx tsc --noEmit -p .`, `yarn test`, `yarn build` y reglas en el emulador: todo en verde.
-- [ ] Revisión del diff por otro agente; corregir lo que salga.
-- [ ] `firebase deploy --only firestore:rules --project dashboard-finance-48b7f`.
-- [ ] `git push` a `main` (Vercel despliega).
+- [x] `npx tsc --noEmit -p .`, `yarn test`, `yarn build` y reglas en el emulador: todo en verde.
+- [x] Revisión del diff por otro agente; corregir lo que salga.
+- [ ] `firebase deploy --only firestore:rules --project dashboard-finance-48b7f`. (pendiente de confirmar que está desplegado)
+- [x] `git push` a `main` (Vercel despliega).
 - [ ] Vault: `Inicio.md` (esquema y reglas) y nota `shared-budget` al día. El enlace (`link --apply`) espera el email de ella y la confirmación del dueño.

@@ -127,6 +127,18 @@ await t("miembro reasigna 25 gastos en un lote", assertSucceeds((() => {
 })()))
 await t("miembro borra gasto", assertSucceeds(deleteDoc(doc(m, "expenses/shared1"))))
 await t("dueño vacía el budget conservando members", assertSucceeds(setDoc(doc(u, "budgets/u1"), { userId: "u1", members: { u1: "Alejandro", m1: "Ana" } })))
+// Lo que hace resetAll: vaciar los ajustes y borrar gastos en el mismo lote, sin tocar members
+await t("dueño vacía ajustes y borra gastos en un lote", assertSucceeds((() => {
+  const batch = writeBatch(u)
+  batch.set(doc(u, "budgets/u1"), { userId: "u1", categories: deleteField(), income: deleteField(), fixedExpenses: deleteField(), wallet: deleteField() }, { merge: true })
+  for (let i = 0; i < 25; i++) batch.delete(doc(u, `expenses/lote${i}`))
+  return batch.commit()
+})()))
+await t("vaciar conserva members", (async () => {
+  const s = await getDoc(doc(u, "budgets/u1"))
+  if (s.data()?.members?.m1 !== "Ana" || "categories" in s.data()) throw new Error("members perdido o ajustes sin vaciar")
+})())
+await t("vaciar sin documento previo también vale", assertSucceeds(setDoc(doc(o, "budgets/u2"), { userId: "u2", categories: deleteField(), wallet: deleteField() }, { merge: true })))
 await t("miembro sigue entrando tras vaciar", assertSucceeds(getDoc(doc(m, "budgets/u1"))))
 
 await env.cleanup()

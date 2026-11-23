@@ -3,7 +3,7 @@ import { Plus, Search, Undo2, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { resolveCategory, todayKey } from "../../utils/month"
 import { netAmount, type BudgetCategory, type Expense, type Members } from "../../types/budget"
-import { authorName, isShared } from "../../utils/members"
+import { authorName, isShared, memberInitials } from "../../utils/members"
 import { catColor, dayLabel } from "./helpers"
 
 interface ExpenseListProps {
@@ -17,6 +17,7 @@ interface ExpenseListProps {
 
 export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, members }: ExpenseListProps) => {
   const shared = isShared(members)
+  const initials = useMemo(() => memberInitials(members), [members])
   const [search, setSearch] = useState("")
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
 
@@ -175,9 +176,10 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
                           // Inicial de quien lo apuntó
                           <span
                             title={authorName(e, members) ?? undefined}
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] text-[10px] font-semibold text-white/70"
+                            aria-label={`Apuntado por ${authorName(e, members) ?? "alguien que ya no está"}`}
+                            className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-white/[0.08] px-1 text-[10px] font-semibold text-white/70"
                           >
-                            {(authorName(e, members) ?? "?").charAt(0).toUpperCase()}
+                            {initials[e.createdBy ?? e.userId] ?? "?"}
                           </span>
                         )}
                         {e.refunds?.length ? (

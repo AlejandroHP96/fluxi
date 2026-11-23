@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import {
-  addDoc, collection, deleteDoc, deleteField, doc, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch,
+  addDoc, collection, deleteDoc, deleteField, doc, getDocsFromServer, onSnapshot, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch,
 } from "firebase/firestore"
 import type { Transaction } from "firebase/firestore"
 import { db } from "../lib/firebase"
@@ -218,18 +218,24 @@ const useFirestoreBudget = (authUid: string | undefined) => {
       fixedExpenses: list.map((f) => ({ id: f.id || newCategoryId(), name: f.name.trim(), amount: Math.abs(Number(f.amount)) || 0 })),
     }, { merge: true }))
 
-  // Empezar de cero: borra todos los gastos y el documento de ajustes (categorías, nóminas, fijos y cartera)
+  // Empezar de cero: borra todos los gastos y vacía los ajustes (categorías, nóminas, fijos y cartera).
+  // Los gastos se piden al servidor (también los que otro miembro acaba de apuntar) y los ajustes se vacían en
+  // el primer lote: si eso falla, no se ha borrado nada. members no se toca (solo lo escribe el script)
   const resetAll = () =>
     run(async () => {
-      const ids = expenses.map((e) => e.id)
-      for (let i = 0; i < ids.length; i += 400) {
-        const batch = writeBatch(db)
-        for (const id of ids.slice(i, i + 400)) batch.delete(doc(db, "expenses", id))
-        await batch.commit()
+      const snap = await getDocsFromServer(query(collection(db, "expenses"), where("userId", "==", userId)))
+      const ids = snap.docs.map((d) => d.id)
+      const batch = writeBatch(db)
+      batch.set(settingsRef(), {
+        userId, categories: deleteField(), income: deleteField(), fixedExpenses: deleteField(), wallet: deleteField(),
+      }, { merge: true })
+      for (const id of ids.slice(0, 399)) batch.delete(doc(db, "expenses", id))
+      await batch.commit()
+      for (let i = 399; i < ids.length; i += 400) {
+        const rest = writeBatch(db)
+        for (const id of ids.slice(i, i + 400)) rest.delete(doc(db, "expenses", id))
+        await rest.commit()
       }
-      // Si el presupuesto es compartido se vacía conservando los miembros (members solo lo escribe el script)
-      if (Object.keys(members).length) await setDoc(settingsRef(), { userId, members })
-      else await deleteDoc(settingsRef())
     })
 
   return {
