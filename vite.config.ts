@@ -25,6 +25,10 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // La versión nueva entra en cuanto se descarga (y main.tsx recarga la página una vez). Sin esto se quedaba
+        // «en espera» hasta cerrar todas las pestañas o la app, y se seguía viendo la versión vieja
+        skipWaiting: true,
+        clientsClaim: true,
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
