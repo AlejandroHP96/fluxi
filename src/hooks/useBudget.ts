@@ -8,6 +8,7 @@ import { DEMO_UID } from "../constants/demo"
 import { newCategoryId, toDateKey, toMonthKey } from "../utils/month"
 import type { BudgetCategory, Expense, FixedExpense, Members, NewExpense, Refund, Themes, Wallet } from "../types/budget"
 import { syncRefundMoves } from "../utils/wallet"
+import { queueSeguimiento } from "../utils/seguimientoClient"
 
 // Categoría lista para guardar: los sobres en € llevan amount (y pct 0); los de % no llevan la clave
 // (Firestore no admite campos undefined)
@@ -140,6 +141,12 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     }
   }
   const settingsRef = () => doc(db, "budgets", userId!)
+  // Tras cambiar gastos, el Seguimiento de Google Sheets de su mes (o meses) se pone al día solo
+  const monthOf = (id: string) => expenses.find((x) => x.id === id)?.date.slice(0, 7)
+  const synced = async (ok: Promise<boolean>, ...months: Array<string | undefined>) => {
+    if (await ok) queueSeguimiento(...months)
+    return ok
+  }
 
   // ── Gastos ──
   // Devuelve el id del gasto creado (o null si falla), para poder deshacerlo
@@ -147,6 +154,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
     if (!userId) return null
     try {
       const ref = await addDoc(collection(db, "expenses"), { ...e, amount: Math.abs(Number(e.amount)), userId, createdBy: authUid, updatedBy: authUid, createdAt: serverTimestamp() })
+      queueSeguimiento(e.date.slice(0, 7))
       return ref.id
     } catch (err) {
       setError((err as Error).message)
@@ -155,7 +163,7 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   }
 
   const updateExpense = (id: string, e: NewExpense) =>
-    run(() => updateDoc(doc(db, "expenses", id), { ...e, amount: Math.abs(Number(e.amount)), updatedBy: authUid }))
+    synced(run(() => updateDoc(doc(db, "expenses", id), { ...e, amount: Math.abs(Number(e.amount)), updatedBy: authUid })), monthOf(id), e.date.slice(0, 7))
 
   // Gasto y cartera en una transacción: se leen del servidor en ese momento, así la cartera no se calcula
   // con un estado desfasado (ni se pisa el saldo si los ajustes aún no habían cargado)
@@ -174,33 +182,33 @@ const useFirestoreBudget = (authUid: string | undefined) => {
   // Al borrar un gasto se quitan también de la cartera los movimientos de sus devoluciones
   const deleteExpense = (id: string) => {
     const e = expenses.find((x) => x.id === id)
-    if (!e?.refunds?.some((r) => r.toWallet)) return run(() => deleteDoc(doc(db, "expenses", id)))
-    return withWallet(id, (tx, fresh, w) => {
+    if (!e?.refunds?.some((r) => r.toWallet)) return synced(run(() => deleteDoc(doc(db, "expenses", id))), monthOf(id))
+    return synced(withWallet(id, (tx, fresh, w) => {
       tx.delete(doc(db, "expenses", id))
       return fresh.refunds?.some((r) => r.toWallet) ? syncRefundMoves(w, fresh.refunds, [], fresh.concept) : null
-    })
+    }), monthOf(id))
   }
 
   // Devoluciones de un gasto (lista completa). Las que van a la cartera se reflejan en ella en la misma transacción
   const saveRefunds = (e: Expense, refunds: Refund[]) =>
-    withWallet(e.id, (tx, fresh, w) => {
+    synced(withWallet(e.id, (tx, fresh, w) => {
       tx.update(doc(db, "expenses", e.id), { refunds, updatedBy: authUid })
       const old = fresh.refunds ?? []
       return [...old, ...refunds].some((r) => r.toWallet) ? syncRefundMoves(w, old, refunds, fresh.concept) : null
-    })
+    }), e.date.slice(0, 7))
 
   // Cartera de ahorros completa (saldo inicial y movimientos)
   const saveWallet = (w: Wallet) => run(() => setDoc(settingsRef(), { userId, wallet: w }, { merge: true }))
 
   // Mover gastos a otra categoría (p. ej. al borrar una categoría)
   const reassignExpenses = (ids: string[], categoryId: string) =>
-    run(async () => {
+    synced(run(async () => {
       for (let i = 0; i < ids.length; i += 400) {
         const batch = writeBatch(db)
         for (const id of ids.slice(i, i + 400)) batch.update(doc(db, "expenses", id), { category: categoryId, updatedBy: authUid })
         await batch.commit()
       }
-    })
+    }), ...ids.map(monthOf))
 
   // ── Nómina y categorías ──
   // Nómina de un mes; null la quita

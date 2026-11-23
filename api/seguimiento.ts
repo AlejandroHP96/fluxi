@@ -5,8 +5,8 @@ import type { Expense } from "../src/types/budget.js"
 
 // Cron de Vercel (cada lunes, ver vercel.json): pone al día en el «Seguimiento» de Google Sheets la pestaña
 // de cada mes de la semana que acaba de terminar (uno, o dos si la semana cruza de mes; así el mes que
-// cierra queda completo). ?month=YYYY-MM rehace (o crea) la de ese mes (lo usa también el botón «Actualizar»
-// de la app, solo para el dueño, con su ID token de Firebase). La pestaña se crea de nuevo cada
+// cierra queda completo). ?month=YYYY-MM rehace (o crea) la de ese mes: la app lo llama cada vez que se apunta,
+// cambia o borra un gasto, con el ID token de Firebase del dueño o de un miembro. La pestaña se crea de nuevo cada
 // vez (con sus gráficas), en el mismo sitio, así que repetirlo no duplica nada.
 //
 // Variables de Vercel: CRON_SECRET (Vercel lo manda como «Authorization: Bearer …»), FIREBASE_SERVICE_ACCOUNT
@@ -21,19 +21,19 @@ const isCron = (header: string | null) => {
   return a.length === b.length && timingSafeEqual(a, b)
 }
 
-// Botón «Actualizar» de la app: el ID token de Firebase tiene que ser del dueño del presupuesto
-async function isOwner(header: string | null, owner: string): Promise<boolean> {
+// Llamadas de la app: uid del ID token de Firebase (luego se mira que sea el dueño o un miembro del presupuesto)
+async function tokenUid(header: string | null): Promise<string | null> {
   const idToken = (header ?? "").replace(/^Bearer\s+/i, "")
   const apiKey = process.env.VITE_FIREBASE_API_KEY
-  if (!idToken || !apiKey) return false
+  if (!idToken || !apiKey) return null
   const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ idToken }),
   })
-  if (!r.ok) return false
+  if (!r.ok) return null
   const d = (await r.json()) as { users?: Array<{ localId?: string }> }
-  return d.users?.[0]?.localId === owner
+  return d.users?.[0]?.localId ?? null
 }
 
 const json = (status: number, body: unknown) =>
@@ -176,7 +176,9 @@ export async function GET(request: Request): Promise<Response> {
   const owner = process.env.FLUXI_OWNER_UID
   if (!sheetId || !owner) return json(500, { error: "Faltan SEGUIMIENTO_SHEET_ID o FLUXI_OWNER_UID" })
   const header = request.headers.get("authorization")
-  if (!isCron(header) && !(await isOwner(header, owner))) return json(401, { error: "No autorizado" })
+  const cron = isCron(header)
+  const uid = cron ? null : await tokenUid(header)
+  if (!cron && !uid) return json(401, { error: "No autorizado" })
 
   const asked = new URL(request.url).searchParams.get("month")
   if (asked && !/^\d{4}-(0[1-9]|1[0-2])$/.test(asked)) return json(400, { error: "month tiene que ser YYYY-MM" })
@@ -190,6 +192,7 @@ export async function GET(request: Request): Promise<Response> {
     const docs = `https://firestore.googleapis.com/v1/projects/${sa.project_id}/databases/(default)/documents`
     const budgetDoc = await gfetch<{ fields?: Record<string, never> }>(token, `${docs}/budgets/${encodeURIComponent(owner)}`)
     const budget = fromFields(budgetDoc.fields) as BudgetDoc
+    if (uid && uid !== owner && !(uid in (budget.members ?? {}))) return json(401, { error: "No autorizado" })
     const found = await gfetch<Array<{ document?: { name: string; fields?: Record<string, never> } }>>(token, `${docs}:runQuery`, {
       method: "POST",
       body: {

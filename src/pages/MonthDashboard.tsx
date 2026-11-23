@@ -6,7 +6,6 @@ import type { Expense } from "../types/budget"
 import { DEMO_EMAIL } from "../constants/demo"
 import { authorshipLabel } from "../utils/members"
 import { applyTheme, rememberTheme, rememberedTheme } from "../constants/themes"
-import { refreshSeguimiento } from "../utils/seguimientoClient"
 import { AppHeader } from "../components/budget/AppHeader"
 import { MonthNav } from "../components/budget/MonthNav"
 import { BentoKpis } from "../components/budget/BentoKpis"
@@ -90,8 +89,6 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       onSignOut={onSignOut}
       onCategories={() => openSettings("categories")}
       onTheme={() => setThemeOpen(true)}
-      // Solo el dueño (no la demo): actualizar ya el Seguimiento del mes que está mirando
-      onRefresh={budget.isOwner && email !== DEMO_EMAIL ? () => refreshSeguimiento(month) : undefined}
     />
   )
 
