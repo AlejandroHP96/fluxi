@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { buildMonthSheet, previousMonth } from "./seguimiento"
+import { buildMonthSheet, monthsOfLastWeek } from "./seguimiento"
 import type { Expense } from "../../src/types/budget"
 
 const categories = [
@@ -29,9 +29,9 @@ describe("buildMonthSheet", () => {
   })
 
   it("sobres en € y %, y sin categoría", () => {
-    expect(find("Copima")).toEqual(["Copima", 200, 30, 170])
-    expect(find("Comida")).toEqual(["Comida", 240, 30, 210]) // 60 % de (1000 − 400 − 200)
-    expect(find("Sin categoría")).toEqual(["Sin categoría", 0, 5, -5])
+    expect(find("Copima")).toEqual(["Copima", 200, 30, 170, "Bien"])
+    expect(find("Comida")).toEqual(["Comida", 240, 30, 210, "Bien"]) // 60 % de (1000 − 400 − 200)
+    expect(find("Sin categoría")).toEqual(["Sin categoría", 0, 5, -5, "Sin sobre"])
   })
 
   it("gastos del mes en orden, con lo devuelto y el neto", () => {
@@ -53,6 +53,19 @@ describe("buildMonthSheet", () => {
     expect(shared.rows[start + 1][6]).toBe("Patricia")
   })
 
+  it("colores de estado: mes y sobres", () => {
+    const status = s.rows.findIndex((r) => r[0] === "Estado")
+    expect(s.rows[status]).toEqual(["Estado", "Vas bien"])
+    expect(s.tones).toContainEqual({ range: { startRow: status, endRow: status + 1, startCol: 0, endCol: 2 }, tone: "ok" })
+    const copima = s.rows.findIndex((r) => r[0] === "Copima")
+    expect(s.rows[copima][4]).toBe("Bien")
+    const over = buildMonthSheet("2026-11", [exp("o", "2026-11-02", 230, "c2")], budget, new Date(2026, 11, 1))
+    const row = over.rows.findIndex((r) => r[0] === "Copima")
+    expect(over.rows[row][4]).toBe("Te pasaste")
+    expect(over.tones).toContainEqual({ range: { startRow: row, endRow: row + 1, startCol: 3, endCol: 5 }, tone: "pasado" })
+    expect(s.rows[1][0]).toBe("Mes cerrado · actualizado el 2026-12-01")
+  })
+
   it("mes sin nómina ni gastos", () => {
     const empty = buildMonthSheet("2026-09", [], { categories })
     expect(empty.rows.find((r) => r[0] === "Nómina")).toEqual(["Nómina", "Sin apuntar"])
@@ -60,9 +73,15 @@ describe("buildMonthSheet", () => {
   })
 })
 
-describe("previousMonth", () => {
-  it("el mes anterior, también en enero", () => {
-    expect(previousMonth(new Date(Date.UTC(2026, 11, 1, 6)))).toBe("2026-11")
-    expect(previousMonth(new Date(Date.UTC(2027, 0, 1, 6)))).toBe("2026-12")
+describe("monthsOfLastWeek", () => {
+  it("una semana dentro del mes", () => {
+    expect(monthsOfLastWeek(new Date(Date.UTC(2026, 10, 23, 6)))).toEqual(["2026-11"])
+  })
+  it("semana que cruza de mes: los dos, el que cierra primero", () => {
+    expect(monthsOfLastWeek(new Date(Date.UTC(2026, 11, 7, 6)))).toEqual(["2026-11", "2026-12"])
+    expect(monthsOfLastWeek(new Date(Date.UTC(2027, 0, 4, 6)))).toEqual(["2026-12", "2027-01"])
+  })
+  it("lunes 1: solo el mes que acaba de cerrar", () => {
+    expect(monthsOfLastWeek(new Date(Date.UTC(2027, 2, 1, 6)))).toEqual(["2027-02"])
   })
 })
