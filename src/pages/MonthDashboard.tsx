@@ -224,6 +224,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
           <ExpenseModal
             expense={editingExpense}
             authorship={editingExpense ? authorshipLabel(editingExpense, budget.members) : null}
+            history={expenses}
             month={month}
             categories={categories}
             onManageCategories={() => openSettings("categories")}

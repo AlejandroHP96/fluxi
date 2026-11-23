@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { createPortal } from "react-dom"
 import { X, Trash2, Undo2, PiggyBank } from "lucide-react"
 import { daysInMonth, resolveCategory } from "../../utils/month"
@@ -7,6 +7,7 @@ import { netAmount, type BudgetCategory, type Expense, type NewExpense, type Ref
 import { CategoryChip } from "./CategoryChip"
 import { catColor, getLastCategory, parseAmount, saveLastCategory } from "./helpers"
 import { newCategoryId, todayKey } from "../../utils/month"
+import { conceptSuggestions, type Suggestion } from "../../utils/suggest"
 
 interface ExpenseModalProps {
   expense: Expense | null // null = gasto nuevo
@@ -19,10 +20,11 @@ interface ExpenseModalProps {
   onSaveRefunds?: (refunds: Refund[]) => Promise<boolean> // solo al editar
   onClose: () => void
   authorship?: string | null // «Apuntado por X · editado por Y» (presupuesto compartido)
+  history?: Expense[] // todos los gastos: al apuntar uno nuevo se sugieren conceptos ya usados
 }
 
 export const ExpenseModal = ({
-  expense, month, categories, onManageCategories, defaultDate, onSave, onDelete, onSaveRefunds, onClose, authorship,
+  expense, month, categories, onManageCategories, defaultDate, onSave, onDelete, onSaveRefunds, onClose, authorship, history = [],
 }: ExpenseModalProps) => {
   const editing = expense !== null
   const spendCats = categories.filter((c) => !c.savings)
@@ -76,6 +78,16 @@ export const ExpenseModal = ({
       document.body.style.overflow = prev
     }
   }, [onClose])
+
+  // Conceptos ya usados: al elegir uno se ponen también su sobre y, si aún no hay importe, el de la última vez
+  const suggestions = useMemo(() => (editing ? [] : conceptSuggestions(history, concept)), [editing, history, concept])
+  const pick = (s: Suggestion) => {
+    setConcept(s.concept)
+    const cat = resolveCategory(s.category, categories)
+    if (cat && !cat.savings) setCategory(cat.id)
+    if (!amount.trim()) setAmount(String(s.amount).replace(".", ","))
+    setErrors({})
+  }
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
@@ -198,6 +210,25 @@ export const ExpenseModal = ({
             className={`${field} ${errors.concept ? bad : ""}`}
           />
           {errors.concept && <p className="mt-1.5 text-xs text-red-300">Pon un concepto.</p>}
+          {suggestions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5" aria-label="Conceptos usados antes">
+              {suggestions.map((s) => {
+                const cat = resolveCategory(s.category, categories)
+                return (
+                  <button
+                    key={s.concept}
+                    type="button"
+                    onClick={() => pick(s)}
+                    className="flex max-w-full items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-left text-xs text-white/80 transition-colors hover:border-cyan-400/40 hover:text-white"
+                  >
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: catColor(categories, cat) }} />
+                    <span className="truncate font-medium">{s.concept}</span>
+                    <span className="shrink-0 tabular-nums text-white/50">{fmt(s.amount)}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <div className="mt-4">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactNode } from "react"
 import { Plus, Search, Undo2, X } from "lucide-react"
 import { fmt } from "../../utils/formatters"
 import { resolveCategory, todayKey } from "../../utils/month"
@@ -23,11 +23,32 @@ const bubbleStyle = (themeId: string | undefined) => {
   return { backgroundColor: `rgb(${t.acc[400]} / 0.22)`, color: `rgb(${t.acc[200]})` }
 }
 
+const FilterChip = ({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) => (
+  <button
+    type="button"
+    aria-pressed={active}
+    onClick={onClick}
+    className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+      active ? "border-cyan-300/60 bg-cyan-400/20 font-semibold text-white" : "border-white/10 bg-white/[0.03] text-white/60 hover:text-white"
+    }`}
+  >
+    {children}
+  </button>
+)
+
 export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, members, themes }: ExpenseListProps) => {
   const shared = isShared(members)
   const initials = useMemo(() => memberInitials(members), [members])
   const [search, setSearch] = useState("")
   const [selectedCat, setSelectedCat] = useState<string | null>(null)
+  const [selectedWho, setSelectedWho] = useState<string | null>(null) // uid de quien lo apuntó
+
+  // Chips de filtro: solo los sobres que tienen gastos este mes, en el orden del reparto
+  const usedCats = useMemo(() => {
+    const ids = new Set(expenses.map((e) => resolveCategory(e.category, categories)?.id ?? "uncat"))
+    return [...categories.filter((c) => ids.has(c.id)).map((c) => ({ id: c.id, name: c.name })), ...(ids.has("uncat") ? [{ id: "uncat", name: "Sin categoría" }] : [])]
+  }, [expenses, categories])
+  const people = useMemo(() => (shared ? Object.entries(members).map(([uid, name]) => ({ uid, name })) : []), [shared, members])
 
   const filtered = useMemo(() => {
     let list = expenses
@@ -37,6 +58,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
         return cat ? cat.id === selectedCat : selectedCat === "uncat"
       })
     }
+    if (selectedWho) list = list.filter((e) => (e.createdBy ?? e.userId) === selectedWho)
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter((e) => {
@@ -47,7 +69,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
       })
     }
     return list
-  }, [expenses, categories, search, selectedCat, shared, members])
+  }, [expenses, categories, search, selectedCat, selectedWho, shared, members])
 
   const groups = useMemo(() => {
     const map = new Map<string, Expense[]>()
@@ -104,19 +126,40 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
             )}
           </div>
 
-          {/* Filtros rápidos de categoría si hay búsqueda activa o muchos gastos */}
-          {(search.trim() || selectedCat) && (
+          {/* Filtros por sobre y, en el presupuesto compartido, por quién lo apuntó */}
+          {(usedCats.length > 1 || people.length > 1) && (
+            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Filtrar gastos">
+              {people.map((p) => (
+                <FilterChip key={p.uid} active={selectedWho === p.uid} onClick={() => setSelectedWho(selectedWho === p.uid ? null : p.uid)}>
+                  <span className="flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-semibold" style={bubbleStyle(themes[p.uid])}>
+                    {initials[p.uid] ?? "?"}
+                  </span>
+                  {p.name}
+                </FilterChip>
+              ))}
+              {people.length > 1 && usedCats.length > 1 && <span className="my-1 w-px shrink-0 bg-white/10" />}
+              {usedCats.length > 1 && usedCats.map((c) => (
+                <FilterChip key={c.id} active={selectedCat === c.id} onClick={() => setSelectedCat(selectedCat === c.id ? null : c.id)}>
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: catColor(categories, c.id === "uncat" ? null : c.id) }} />
+                  {c.name}
+                </FilterChip>
+              ))}
+            </div>
+          )}
+
+          {(search.trim() || selectedCat || selectedWho) && (
             <div className="flex items-center justify-between text-xs text-white/55 px-1">
               <span>
                 {filtered.length} {filtered.length === 1 ? "resultado" : "resultados"}:{" "}
                 <span className="font-semibold text-white/80 tabular-nums">{fmt(totalFilteredAmount)}</span>
               </span>
-              {(search || selectedCat) && (
+              {(search || selectedCat || selectedWho) && (
                 <button
                   type="button"
                   onClick={() => {
                     setSearch("")
                     setSelectedCat(null)
+                    setSelectedWho(null)
                   }}
                   className="text-cyan-300 hover:underline"
                 >
@@ -148,7 +191,7 @@ export const ExpenseList = ({ expenses, categories, loading, onSelect, onAdd, me
         </div>
       ) : groups.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-white/10 p-8 text-center text-sm text-white/50">
-          No hay gastos que coincidan con la búsqueda «{search}».
+          {search.trim() ? <>No hay gastos que coincidan con la búsqueda «{search}».</> : "No hay gastos con estos filtros."}
         </div>
       ) : (
         // Una sola tarjeta de alto fijo que se desplaza por dentro; la cabecera del día se queda pegada arriba
