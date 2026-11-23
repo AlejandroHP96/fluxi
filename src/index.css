@@ -12,6 +12,13 @@
   --acc-950: 4 32 42;
   --alt-400: 56 189 248;
   --alt-500: 14 165 233;
+  --bg: 6 9 19;
+  --ink: 7 9 14;
+  --ink2: 10 16 32;
+  --ink3: 12 15 22;
+  --glow: 10 42 51;
+  --orb2: 99 102 241;
+  --orb3: 168 85 247;
 }
 
 * {
@@ -21,13 +28,13 @@
 }
 
 body {
-  background-color: #060913;
+  background-color: rgb(var(--bg));
   /* Fondo orgánico con orbes líquidos y malla de luz */
   background-image: 
     radial-gradient(ellipse 80% 60% at 15% -10%, rgb(var(--acc-500) / 0.22), transparent 60%),
-    radial-gradient(ellipse 70% 50% at 85% 110%, rgba(99, 102, 241, 0.20), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 85% 110%, rgb(var(--orb2) / 0.20), transparent 60%),
     radial-gradient(ellipse 50% 40% at 50% 45%, rgb(var(--alt-500) / 0.10), transparent 70%),
-    radial-gradient(ellipse 60% 50% at 90% 20%, rgba(168, 85, 247, 0.12), transparent 60%);
+    radial-gradient(ellipse 60% 50% at 90% 20%, rgb(var(--orb3) / 0.12), transparent 60%);
   background-attachment: fixed;
   color: #ffffff;
   font-family: 'DM Sans', sans-serif;
@@ -75,7 +82,7 @@ body {
   background: linear-gradient(
     180deg,
     rgba(10, 16, 30, 0.75) 0%,
-    rgba(6, 10, 20, 0.85) 100%
+    rgb(var(--bg) / 0.85) 100%
   );
   backdrop-filter: blur(32px) saturate(200%);
   -webkit-backdrop-filter: blur(32px) saturate(200%);
@@ -231,7 +238,7 @@ html.zk-loading #navbar-brand-logo {
   fill: currentColor;
   opacity: 0;
   transform-origin: 540px 540px;
-  stroke: #06b6d4;
+  stroke: rgb(var(--acc-500));
   stroke-width: 6;
   stroke-dasharray: 800;
   stroke-dashoffset: 800;

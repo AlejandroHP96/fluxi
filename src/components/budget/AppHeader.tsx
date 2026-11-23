@@ -67,7 +67,7 @@ const RefreshButton = ({ onRefresh }: { onRefresh: () => Promise<string> }) => {
 }
 
 export const AppHeader = ({ email, onSignOut, onCategories, onTheme, onRefresh }: AppHeaderProps) => (
-  <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#07090e]/80 backdrop-blur-xl">
+  <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink/80 backdrop-blur-xl">
     <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-3 sm:px-6">
       <div className="flex items-center gap-2.5">
         <ZkLogo id="navbar-brand-logo" className="h-8 w-8 shrink-0" />

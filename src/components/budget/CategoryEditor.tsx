@@ -80,7 +80,7 @@ export const CategoryEditor = ({ draft, onChange, onDelete, sticky = false }: Ca
 
   return (
     <div className="space-y-3">
-      <div className={sticky ? "sticky top-0 z-10 -mx-1 bg-[#0a1020] px-1 pb-1 pt-1" : ""}>
+      <div className={sticky ? "sticky top-0 z-10 -mx-1 bg-ink-2 px-1 pb-1 pt-1" : ""}>
         <PctTotal draft={draft} />
       </div>
 
@@ -166,7 +166,7 @@ export const CategoryEditor = ({ draft, onChange, onDelete, sticky = false }: Ca
         ))}
       </ul>
 
-      <div className={sticky ? "sticky bottom-0 z-10 -mx-1 bg-[#0a1020] px-1 pb-1 pt-2" : ""}>
+      <div className={sticky ? "sticky bottom-0 z-10 -mx-1 bg-ink-2 px-1 pb-1 pt-2" : ""}>
         <button
           type="button"
           onClick={add}

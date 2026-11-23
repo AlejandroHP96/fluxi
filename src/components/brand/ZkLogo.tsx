@@ -18,7 +18,7 @@ export const ZkLogo = ({ id, className = "", title = "Fluxi" }: ZkLogoProps) => 
     role="img"
     aria-label={title}
     className={`text-white overflow-visible ${className}`}
-    style={{ filter: "drop-shadow(0 0 6px rgba(34, 211, 238, 0.55))" }}
+    style={{ filter: "drop-shadow(0 0 6px rgb(var(--acc-400) / 0.55))" }}
   >
     {vectors.blades.map((d, idx) => (
       <path key={idx} d={d} fill="currentColor" />

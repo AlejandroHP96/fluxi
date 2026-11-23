@@ -12,8 +12,8 @@ export const parseAmount = (raw: string): number => {
 // Paleta de categorías: sin verde, ámbar ni rojo (son los colores de estado) y sin repetir en consecutivas
 // Categorías de gasto: sin verde, ámbar ni rojo (son los colores de estado) y sin el cian del ahorro
 const CATEGORY_PALETTE = ["#a78bfa", "#f472b6", "#60a5fa", "#e879f9", "#818cf8", "#c084fc", "#93c5fd", "#94a3b8"]
-// Ahorro: siempre cian, para distinguirlo de las de gasto
-const SAVINGS_COLOR = "#22d3ee"
+// Ahorro: el color del tema, para distinguirlo de las de gasto
+const SAVINGS_COLOR = "rgb(var(--acc-400))" // el acento del tema
 
 // Color por posición en la lista de categorías del usuario (gris si ya no existe)
 export const catColor = (categories: BudgetCategory[], category: BudgetCategory | string | null | undefined): string => {

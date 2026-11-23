@@ -102,8 +102,8 @@ export function ZkLoader({ children, isLoading = false }: { children: ReactNode;
       <div
         className="fixed inset-0 z-[100] pointer-events-none"
         style={{
-          backgroundColor: "#07090e",
-          backgroundImage: "radial-gradient(circle at center, #0a2a33 0%, #07090e 100%)",
+          backgroundColor: "rgb(var(--ink))",
+          backgroundImage: "radial-gradient(circle at center, rgb(var(--glow)) 0%, rgb(var(--ink)) 100%)",
           opacity: isFlying ? 0 : 1,
           clipPath: isFlying ? `circle(180% at ${focusX}px ${focusY}px)` : "circle(100% at center)",
           transition: "clip-path 1.05s cubic-bezier(0.16, 1, 0.3, 1), opacity 1.05s ease-in-out",
@@ -112,7 +112,7 @@ export function ZkLoader({ children, isLoading = false }: { children: ReactNode;
         <div className="absolute inset-0 flex items-center justify-center">
           <div
             className={`w-96 h-96 rounded-full blur-3xl transition-opacity duration-700 ${isFlying ? "opacity-0" : "opacity-100 animate-pulse"}`}
-            style={{ backgroundColor: "rgba(34, 211, 238, 0.22)" }}
+            style={{ backgroundColor: "rgb(var(--acc-400) / 0.22)" }}
           />
         </div>
       </div>
@@ -122,7 +122,7 @@ export function ZkLoader({ children, isLoading = false }: { children: ReactNode;
         <svg
           viewBox={ZK_VIEWBOX}
           className="w-full h-full overflow-visible"
-          style={{ filter: "drop-shadow(0 0 24px rgba(34, 211, 238, 0.65))" }}
+          style={{ filter: "drop-shadow(0 0 24px rgb(var(--acc-400) / 0.65))" }}
         >
           {vectors.blades.map((d, idx) => (
             <path

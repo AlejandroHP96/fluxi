@@ -7,6 +7,10 @@ import "@fontsource/dm-sans/600.css"
 import "@fontsource/dm-sans/700.css"
 import "@fontsource/dm-sans/800.css"
 import "./index.css"
+import { applyLastTheme } from "./constants/themes"
+
+// El tema de la última vez, antes de pintar nada (también el loader del logo)
+applyLastTheme()
 
 // Tras un despliegue nuevo, una pestaña abierta puede pedir un trozo de JS que ya no existe: se recarga la página
 window.addEventListener("vite:preloadError", () => window.location.reload())

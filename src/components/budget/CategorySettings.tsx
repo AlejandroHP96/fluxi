@@ -215,7 +215,7 @@ export const CategorySettings = ({
                 value={pending.target}
                 onChange={(e) => setPending({ ...pending, target: e.target.value })}
                 aria-label="Destino de los gastos"
-                className="glass-input w-full rounded-xl px-3 py-2.5 text-base [&>option]:bg-[#0b1020]"
+                className="glass-input w-full rounded-xl px-3 py-2.5 text-base [&>option]:bg-ink-2"
               >
                 {targets.map((t) => (
                   <option key={t.id} value={t.id}>

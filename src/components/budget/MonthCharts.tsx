@@ -256,8 +256,7 @@ export const MonthCharts = ({
                       cx={cx}
                       cy={cy}
                       r={isHovered ? 5 : 3}
-                      style={{ fill: "rgb(var(--acc-400))" }}
-                      stroke="#07090e"
+                      style={{ fill: "rgb(var(--acc-400))", stroke: "rgb(var(--ink))" }}
                       strokeWidth="2"
                     />
                   )}

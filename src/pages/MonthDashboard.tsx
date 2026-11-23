@@ -111,7 +111,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   // Primera vez: nómina + reparto propuesto
   if (firstTime) {
     return (
-      <div className="min-h-screen bg-[#07090e] text-white">
+      <div className="min-h-screen bg-ink text-white">
         {header}
         <main className="fade-up mx-auto max-w-5xl space-y-5 px-4 pb-16 pt-6 sm:px-6 sm:pt-10">
           {errorBanner}
@@ -128,7 +128,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white">
+    <div className="min-h-screen bg-ink text-white">
       {header}
 
       <main className="fade-up mx-auto max-w-6xl space-y-6 px-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:pb-12 sm:pt-6">
@@ -193,7 +193,7 @@ const MonthDashboard = ({ email, onSignOut, budget }: MonthDashboardProps) => {
       </main>
 
       {/* Móvil: barra inferior opaca a todo el ancho; su altura está reservada al final de la página */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#07090e] px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:hidden">
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-ink px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:hidden">
         <button
           onClick={openNew}
           className="liquid-button flex h-12 w-full items-center justify-center gap-2 rounded-xl text-base font-semibold text-cyan-950"

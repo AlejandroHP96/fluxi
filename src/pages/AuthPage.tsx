@@ -65,7 +65,7 @@ const AuthPage = ({ onSignIn, onResetPassword }: AuthPageProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-ink text-white flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center gap-3 justify-center mb-10">
           <ZkLogo id="navbar-brand-logo" className="w-10 h-10" />

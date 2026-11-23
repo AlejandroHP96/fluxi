@@ -18,6 +18,12 @@ export default {
         expense: "#f87171",
         savings: "#06b6d4",
         accent:  "rgb(var(--acc-500) / <alpha-value>)",
+        // Fondos casi negros del tema
+        ink: {
+          DEFAULT: "rgb(var(--ink) / <alpha-value>)",
+          2: "rgb(var(--ink2) / <alpha-value>)",
+          3: "rgb(var(--ink3) / <alpha-value>)",
+        },
         // El «cian» de la app es el acento del tema elegido (src/constants/themes.ts)
         cyan: Object.fromEntries(
           [100, 200, 300, 400, 500, 950].map((n) => [n, `rgb(var(--acc-${n}) / <alpha-value>)`])
