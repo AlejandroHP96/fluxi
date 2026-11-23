@@ -99,7 +99,7 @@ export async function GET(request: Request): Promise<Response> {
       },
     })
 
-    return json(200, { month, expenses: sheet.rows.length, sheet: `https://docs.google.com/spreadsheets/d/${sheetId}` })
+    return json(200, { month, expenses: expenses.filter((e) => e.date.startsWith(month)).length, sheet: `https://docs.google.com/spreadsheets/d/${sheetId}` })
   } catch (e) {
     console.error(e)
     return json(500, { error: (e as Error).message })
