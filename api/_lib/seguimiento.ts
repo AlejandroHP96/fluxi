@@ -79,6 +79,17 @@ export function buildMonthSheet(month: string, expenses: Expense[], budget: Budg
   bold.push({ startRow: summaryStart, endRow: rows.length, startCol: 0, endCol: 1 })
   rows.push([])
 
+  // Gastos fijos, uno a uno
+  const fixed = budget.fixedExpenses ?? []
+  if (fixed.length) {
+    const fixedHeader = rows.length
+    rows.push(["Gasto fijo", "Importe"])
+    bold.push({ startRow: fixedHeader, endRow: fixedHeader + 1, startCol: 0, endCol: 2 })
+    for (const f of fixed) rows.push([f.name, r2(Number(f.amount) || 0)])
+    money.push({ startRow: fixedHeader + 1, endRow: rows.length, startCol: 1, endCol: 2 })
+    rows.push([])
+  }
+
   // Sobres
   const envHeader = rows.length
   rows.push(["Sobre", "Asignado", "Gastado", "Queda", "Estado"])

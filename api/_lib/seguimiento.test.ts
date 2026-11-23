@@ -28,6 +28,12 @@ describe("buildMonthSheet", () => {
     expect(find("Sobrante")).toEqual(["Sobrante", 535])
   })
 
+  it("gastos fijos desglosados", () => {
+    const start = s.rows.findIndex((r) => r[0] === "Gasto fijo")
+    expect(s.rows.slice(start, start + 3)).toEqual([["Gasto fijo", "Importe"], ["Alquiler", 400], []])
+    expect(buildMonthSheet("2026-11", [], { categories }).rows.some((r) => r[0] === "Gasto fijo")).toBe(false)
+  })
+
   it("sobres en € y %, y sin categoría", () => {
     expect(find("Copima")).toEqual(["Copima", 200, 30, 170, "Bien"])
     expect(find("Comida")).toEqual(["Comida", 240, 30, 210, "Bien"]) // 60 % de (1000 − 400 − 200)
